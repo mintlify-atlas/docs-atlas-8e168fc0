@@ -1,0 +1,105 @@
+{
+  "projectType": "ai-ml",
+  "projectName": "Base Audit Bot",
+  "projectDescription": "Autonomous AI agent that monitors Base blockchain deployments, audits smart contracts using Claude AI, and posts findings to Twitter",
+  "theme": "aspen",
+  "primaryColor": "#0052FF",
+  "lightColor": "#2B8AF6",
+  "darkColor": "#0041CC",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/architecture",
+              "concepts/blockchain-monitoring",
+              "concepts/ai-auditing",
+              "concepts/github-discovery",
+              "concepts/twitter-integration"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/configuration",
+              "guides/deployment",
+              "guides/docker",
+              "guides/webhook-setup",
+              "guides/troubleshooting"
+            ]
+          },
+          {
+            "group": "Components",
+            "pages": [
+              "components/scanner",
+              "components/auditor",
+              "components/github-finder",
+              "components/twitter-bot",
+              "components/webhook-server",
+              "components/database"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Core Classes",
+            "pages": [
+              "api/audit-bot",
+              "api/base-chain-scanner",
+              "api/solidity-auditor",
+              "api/github-finder",
+              "api/twitter-bot",
+              "api/database"
+            ]
+          },
+          {
+            "group": "Data Models",
+            "pages": [
+              "api/models",
+              "api/configuration"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Real-time Base blockchain monitoring for contract deployments",
+    "AI-powered smart contract security auditing using Claude",
+    "Automatic GitHub repository discovery for verified contracts",
+    "Automated Twitter reporting with detailed findings",
+    "GitHub webhook integration for repository updates",
+    "SQLite persistence with comprehensive audit history",
+    "Docker deployment support",
+    "DM-based manual audit commands"
+  ],
+  "publicApiSurface": [
+    "AuditBot.run()",
+    "BaseChainScanner.scan_blocks()",
+    "BaseChainScanner.is_contract_verified()",
+    "BaseChainScanner.get_contract_source()",
+    "SolidityAuditor.audit_repo()",
+    "SolidityAuditor.audit_source_code()",
+    "GitHubFinder.find_repo()",
+    "TwitterBot.post_audit()",
+    "TwitterBot.post_daily_summary()",
+    "TwitterBot.check_dm_commands()",
+    "Database.add_contract()",
+    "Database.add_audit()",
+    "Database.get_daily_stats()"
+  ]
+}
