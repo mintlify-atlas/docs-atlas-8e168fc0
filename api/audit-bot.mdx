@@ -12,7 +12,7 @@ The `AuditBot` class is the central orchestrator for the Base Audit Bot. It init
 ```python
 from config import Config
 from bot import AuditBot
-```
+```python
 
 ## Initialization
 
@@ -22,7 +22,7 @@ from bot import AuditBot
 
 ```python
 bot = AuditBot(config)
-```
+```python
 
 ### Configuration Requirements
 
@@ -47,7 +47,7 @@ Starts the main bot loop and runs continuously until stopped.
 
 ```python
 bot.run()
-```
+```python
 
 <ResponseField name="return" type="None">
   This method runs indefinitely and does not return
@@ -65,7 +65,7 @@ Gracefully shuts down the bot and all its components.
 
 ```python
 bot.shutdown()
-```
+```python
 
 <ResponseField name="return" type="None">
   Stops the bot and cleans up resources
@@ -164,7 +164,7 @@ bot.github_finder   # GitHubFinder instance
 bot.auditor         # SolidityAuditor instance
 bot.twitter_bot     # TwitterBot instance
 bot.webhook_server  # WebhookServer instance (if configured)
-```
+```python
 
 ## Example Usage
 
@@ -183,7 +183,7 @@ try:
     bot.run()
 except KeyboardInterrupt:
     bot.shutdown()
-```
+```python
 
 ## Error Handling
 

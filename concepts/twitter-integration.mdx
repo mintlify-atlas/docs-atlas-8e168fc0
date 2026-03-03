@@ -53,7 +53,7 @@ class TwitterBot:
         except Exception as e:
             logger.error(f"Twitter authentication failed: {e}")
             raise
-```
+```python
 
 ### Credentials Structure
 
@@ -66,7 +66,7 @@ class TwitterCredentials:
     access_token: str      # Access token
     access_secret: str     # Access token secret
     bearer_token: str      # Bearer token for v2 API
-```
+```python
 
 <Info>
 **Twitter API Setup:**
@@ -134,10 +134,10 @@ def post_audit(
         )
     
     return None
-```
+```python
 
 **Example output:**
-```
+```python
 🔍 New audit: MyToken
 
 📊 Findings: 3 issue(s) found
@@ -147,7 +147,7 @@ def post_audit(
 📁 Repo: owner/repo
 
 #BaseChain #SmartContractSecurity
-```
+```python
 
 ### Tweet Truncation
 
@@ -174,7 +174,7 @@ def _truncate_tweet(self, text: str) -> str:
         content_text = content_text[:available - 3] + "..."
     
     return content_text + "\n\n" + hashtag_text
-```
+```python
 
 ## Detailed Finding Threads
 
@@ -220,7 +220,7 @@ Severity: {finding.severity}
         thread_messages.append(finding_text)
     
     return self.post_thread(thread_messages)
-```
+```python
 
 ### Thread Posting
 
@@ -256,7 +256,7 @@ def post_thread(self, messages: list[str]) -> list[str]:
             break
     
     return tweet_ids
-```
+```python
 
 <Info>
 Threads are posted when:
@@ -307,7 +307,7 @@ def post_daily_summary(self, stats: dict) -> Optional[Tweet]:
         )
     
     return None
-```
+```python
 
 ## DM Command Processing
 
@@ -343,7 +343,7 @@ def check_dm_commands(self) -> list[dict]:
         logger.error(f"Failed to check DMs: {e}")
     
     return commands
-```
+```python
 
 ### Sending DM Responses
 
@@ -356,7 +356,7 @@ def send_dm(self, user_id: str, message: str) -> bool:
     except tweepy.TweepyException as e:
         logger.error(f"Failed to send DM: {e}")
         return False
-```
+```python
 
 **Command workflow:**
 1. User sends DM: `audit 0x1234...abcd`
@@ -416,7 +416,7 @@ def post_repo_update(
         )
     
     return None
-```
+```python
 
 ## Rate Limiting
 
@@ -426,7 +426,7 @@ Tweepy handles rate limiting automatically:
 # wait_on_rate_limit=True pauses requests when limits are hit
 self.api = tweepy.API(self.auth, wait_on_rate_limit=True)
 self.client = tweepy.Client(..., wait_on_rate_limit=True)
-```
+```python
 
 **Twitter API Rate Limits:**
 - **Post tweets**: 300 per 3 hours (user context)
@@ -482,7 +482,7 @@ for cmd in commands:
 if should_post_summary:
     stats = self.db.get_daily_stats()
     self.twitter_bot.post_daily_summary(stats)
-```
+```python
 
 ## Error Handling
 
@@ -495,7 +495,7 @@ try:
 except tweepy.TweepyException as e:
     logger.error(f"Failed to post tweet: {e}")
     return None
-```
+```python
 
 Failed posts are logged but don't crash the bot, ensuring continuous operation.
 

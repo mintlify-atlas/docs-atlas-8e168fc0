@@ -21,7 +21,7 @@ twitter_creds = TwitterCredentials(
 )
 
 twitter_bot = TwitterBot(twitter_creds)
-```
+```python
 
 ### TwitterCredentials
 
@@ -53,7 +53,7 @@ Posts an audit result tweet.
 
 ```python
 tweet = twitter_bot.post_audit(contract, audit, findings_summary)
-```
+```python
 
 **Parameters:**
 - `contract` (Contract): Contract object
@@ -68,7 +68,7 @@ Posts detailed findings as a thread.
 
 ```python
 tweet_ids = twitter_bot.post_detailed_findings(contract, audit, findings)
-```
+```python
 
 **Parameters:**
 - `contract` (Contract): Contract object
@@ -87,7 +87,7 @@ tweet = twitter_bot.post_repo_update(
     commit_message="Fix security issue",
     commit_url="https://github.com/owner/repo/commit/abc123"
 )
-```
+```python
 
 **Returns:** `Tweet | None` - Tweet object if successful
 
@@ -97,7 +97,7 @@ Posts daily audit statistics summary.
 
 ```python
 tweet = twitter_bot.post_daily_summary(stats)
-```
+```python
 
 **Parameters:**
 - `stats` (dict): Statistics dictionary with keys:
@@ -116,7 +116,7 @@ Posts a thread of tweets.
 
 ```python
 tweet_ids = twitter_bot.post_thread(messages)
-```
+```python
 
 **Parameters:**
 - `messages` (list[str]): List of tweet messages
@@ -129,7 +129,7 @@ Checks for DM commands like "audit [address]".
 
 ```python
 commands = twitter_bot.check_dm_commands()
-```
+```python
 
 **Returns:** `list[dict]` - List of command dictionaries:
 ```python
@@ -139,7 +139,7 @@ commands = twitter_bot.check_dm_commands()
     "sender_id": "...",
     "dm_id": "..."
 }
-```
+```python
 
 ### send_dm()
 
@@ -147,7 +147,7 @@ Sends a direct message to a user.
 
 ```python
 success = twitter_bot.send_dm(user_id, message)
-```
+```python
 
 **Returns:** `bool` - True if successful
 
@@ -155,7 +155,7 @@ success = twitter_bot.send_dm(user_id, message)
 
 ### Audit Tweet
 
-```
+```python
 🔍 New audit: ContractName
 
 📊 Findings: 5 issue(s) found
@@ -165,11 +165,11 @@ success = twitter_bot.send_dm(user_id, message)
 📁 Repo: owner/repository
 
 #BaseChain #SmartContractSecurity
-```
+```python
 
 ### Detailed Findings Thread
 
-```
+```python
 🧵 Detailed Audit: ContractName
 
 📊 3 significant issue(s) found
@@ -185,11 +185,11 @@ Severity: Critical
 External call before state update allows reentrancy attack...
 
 💡 Fix: Update state before external calls...
-```
+```python
 
 ### Repository Update
 
-```
+```python
 🔄 Update detected: owner/repo
 
 📝 Fix security vulnerability in transfer function
@@ -197,11 +197,11 @@ External call before state update allows reentrancy attack...
 🔗 https://github.com/owner/repo/commit/abc123
 
 #BaseChain #Development
-```
+```python
 
 ### Daily Summary
 
-```
+```python
 📊 Daily Audit Summary
 
 🔍 Contracts scanned: 15
@@ -212,7 +212,7 @@ External call before state update allows reentrancy attack...
    - Medium: 10
 
 #BaseChain #SmartContractSecurity
-```
+```python
 
 ## Usage Examples
 
@@ -238,7 +238,7 @@ def _post_audit_tweet(self, contract: Contract, audit: Audit, report: FullAuditR
 
     except Exception as e:
         logger.error(f"Error posting tweet: {e}")
-```
+```python
 
 ### Processing DM Commands
 
@@ -270,7 +270,7 @@ def _check_dm_commands(self):
 
     except Exception as e:
         logger.error(f"Error checking DM commands: {e}")
-```
+```python
 
 ### Posting Daily Summary
 
@@ -299,7 +299,7 @@ def _check_daily_summary(self):
 
             except Exception as e:
                 logger.error(f"Error posting daily summary: {e}")
-```
+```python
 
 ## Tweet Object
 
@@ -312,7 +312,7 @@ class Tweet:
     posted_at: datetime        # Post timestamp
     tweet_type: str            # 'audit', 'update', 'summary'
     content: str               # Tweet content
-```
+```python
 
 ## Features
 

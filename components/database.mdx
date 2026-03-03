@@ -14,7 +14,7 @@ from models import Database
 from pathlib import Path
 
 db = Database(db_path=Path("./data/audit_bot.db"))
-```
+```python
 
 ### Parameters
 
@@ -111,7 +111,7 @@ class Contract:
     last_audit: Optional[datetime]
     contract_name: Optional[str] = None
     is_verified: bool = False
-```
+```python
 
 ### Audit
 
@@ -127,7 +127,7 @@ class Audit:
     low_count: int
     summary: str
     full_report: Optional[str] = None
-```
+```python
 
 ### Tweet
 
@@ -140,7 +140,7 @@ class Tweet:
     posted_at: datetime
     tweet_type: str  # 'audit', 'update', 'summary'
     content: str
-```
+```python
 
 ## Contract Operations
 
@@ -150,7 +150,7 @@ Adds a new contract to the database.
 
 ```python
 contract_id = db.add_contract(contract)
-```
+```python
 
 **Parameters:**
 - `contract` (Contract): Contract object to add
@@ -163,7 +163,7 @@ Retrieves a contract by its address.
 
 ```python
 contract = db.get_contract_by_address("0x...")
-```
+```python
 
 **Returns:** `Contract | None` - Contract object or None if not found
 
@@ -173,7 +173,7 @@ Updates a contract's repository URL.
 
 ```python
 db.update_contract_repo(address, repo_url)
-```
+```python
 
 ### update_contract_audit_time()
 
@@ -181,7 +181,7 @@ Updates a contract's last audit timestamp.
 
 ```python
 db.update_contract_audit_time(address)
-```
+```python
 
 ### get_unaudited_contracts()
 
@@ -189,7 +189,7 @@ Retrieves contracts that haven't been audited.
 
 ```python
 contracts = db.get_unaudited_contracts(limit=50)
-```
+```python
 
 **Returns:** `list[Contract]` - List of unaudited contracts with repository URLs
 
@@ -201,7 +201,7 @@ Adds a new audit result.
 
 ```python
 audit_id = db.add_audit(audit)
-```
+```python
 
 **Parameters:**
 - `audit` (Audit): Audit object to add
@@ -214,7 +214,7 @@ Retrieves the most recent audit for a contract.
 
 ```python
 audit = db.get_audit_by_contract_id(contract_id)
-```
+```python
 
 **Returns:** `Audit | None` - Most recent audit or None
 
@@ -224,7 +224,7 @@ Retrieves audit statistics for today.
 
 ```python
 stats = db.get_daily_stats()
-```
+```python
 
 **Returns:** `dict` with keys:
 - `total_audits`: Total audits today
@@ -241,7 +241,7 @@ Records a posted tweet.
 
 ```python
 tweet_id = db.add_tweet(tweet)
-```
+```python
 
 **Parameters:**
 - `tweet` (Tweet): Tweet object to add
@@ -256,7 +256,7 @@ Adds a repository to monitor.
 
 ```python
 db.add_monitored_repo(repo_url, contract_id)
-```
+```python
 
 ### get_monitored_repos()
 
@@ -264,7 +264,7 @@ Retrieves all monitored repositories.
 
 ```python
 repos = db.get_monitored_repos()
-```
+```python
 
 **Returns:** `list[dict]` - List of repository records
 
@@ -274,7 +274,7 @@ Updates the last known commit for a repository.
 
 ```python
 db.update_repo_commit(repo_url, commit_sha)
-```
+```python
 
 ## Blocklist Operations
 
@@ -286,7 +286,7 @@ Checks if an address is blocklisted.
 if db.is_blocklisted(address):
     # Skip processing
     pass
-```
+```python
 
 **Returns:** `bool` - True if address is blocklisted
 
@@ -296,7 +296,7 @@ Adds an address to the blocklist.
 
 ```python
 db.add_to_blocklist(address, reason="Spam contract")
-```
+```python
 
 ## Statistics Operations
 
@@ -306,7 +306,7 @@ Retrieves count of contracts scanned today.
 
 ```python
 count = db.get_contracts_scanned_today()
-```
+```python
 
 **Returns:** `int` - Number of contracts scanned today
 
@@ -334,7 +334,7 @@ contract_id = self.db.add_contract(contract)
 contract.id = contract_id
 
 logger.info(f"Saved contract {address} (verified: {is_verified}, repo: {repo_url})")
-```
+```python
 
 ### Saving Audit Results
 
@@ -362,7 +362,7 @@ self.db.update_contract_audit_time(contract.address)
 
 # Add to monitored repos
 self.db.add_monitored_repo(repo_url, contract.id)
-```
+```python
 
 ### Checking Blocklist
 
@@ -373,7 +373,7 @@ From `bot.py:197-200`:
 if self.db.is_blocklisted(address) or self.db.is_blocklisted(deployment.deployer):
     logger.info(f"Skipping blocklisted address: {address}")
     return
-```
+```python
 
 ### Getting Daily Statistics
 
@@ -393,7 +393,7 @@ try:
             logger.info("Posted daily summary")
 except Exception as e:
     logger.error(f"Error posting daily summary: {e}")
-```
+```python
 
 ## Features
 
@@ -422,7 +422,7 @@ def _get_connection(self) -> sqlite3.Connection:
     conn = sqlite3.connect(str(self.db_path))
     conn.row_factory = sqlite3.Row  # Access columns by name
     return conn
-```
+```python
 
 Connections are closed after each operation to prevent locking issues.
 
@@ -435,7 +435,7 @@ CREATE INDEX idx_contracts_address ON contracts(address)
 CREATE INDEX idx_contracts_deployer ON contracts(deployer)
 CREATE INDEX idx_audits_contract_id ON audits(contract_id)
 CREATE INDEX idx_tweets_audit_id ON tweets(audit_id)
-```
+```python
 
 <Note>
   All addresses are normalized to lowercase before storage to ensure consistent lookups regardless of input case.

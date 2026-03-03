@@ -296,18 +296,19 @@ DATABASE_PATH=./data/bot.db
 
 # Temporary Directory for Cloning
 TEMP_DIR=./temp_repos
-```
+```python
 
 ## Security Best Practices
 
 <Warning>
-  **Never commit your `.env` file to version control!**
-  
-  Add it to `.gitignore`:
-  ```bash
-  echo ".env" >> .gitignore
-  ```
+**Never commit your `.env` file to version control!**
+
+Add `.env` to your `.gitignore` file to prevent committing it accidentally.
 </Warning>
+
+```bash
+echo ".env" >> .gitignore
+```
 
 <Tip>
   Additional security recommendations:
@@ -326,6 +327,6 @@ The configuration is loaded automatically from the `.env` file using the `Config
 from config import get_config
 
 config = get_config()  # Loads and validates configuration
-```
+```python
 
 The bot uses Python's `dotenv` library to load environment variables from the `.env` file before reading them.

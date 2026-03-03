@@ -272,7 +272,7 @@ Sent when commits are pushed to the repository (via `webhook.py:88`).
     "solidity_changed": true,
     "modified_files": ["contracts/Token.sol", "README.md"]
 }
-```
+```python
 
 ## Security
 
@@ -293,7 +293,7 @@ def _verify_signature(self, payload: bytes, signature: str) -> bool:
     ).hexdigest()
     
     return hmac.compare_digest(signature, expected_signature)
-```
+```python
 
 <Warning>
   **Requests with invalid signatures are rejected with HTTP 401** (via `webhook.py:72`).
@@ -308,16 +308,10 @@ def _verify_signature(self, payload: bytes, signature: str) -> bool:
 
 <AccordionGroup>
   <Accordion title="Use strong webhook secrets">
-    Generate cryptographically secure secrets:
-    ```bash
-    # Linux/Mac
-    openssl rand -hex 32
-    
-    # Python
-    python -c "import secrets; print(secrets.token_hex(32))"
-    ```
-    
-    Minimum recommended length: 32 characters
+    Generate cryptographically secure secrets (minimum 32 characters):
+
+    - Use `openssl rand -hex 32` on Linux/Mac
+    - Use `python -c "import secrets; print(secrets.token_hex(32))"` in Python
   </Accordion>
   
   <Accordion title="Enable HTTPS">
@@ -332,21 +326,8 @@ def _verify_signature(self, payload: bytes, signature: str) -> bool:
   </Accordion>
   
   <Accordion title="Restrict to GitHub IPs">
-    Optionally restrict webhook endpoint to GitHub's IP ranges:
-    
-    ```nginx
-    # Nginx example
-    location /webhook/github {
-        allow 192.30.252.0/22;
-        allow 185.199.108.0/22;
-        allow 140.82.112.0/20;
-        allow 143.55.64.0/20;
-        deny all;
-        
-        proxy_pass http://localhost:5000;
-    }
-    ```
-    
+    Optionally restrict webhook endpoint to GitHub's IP ranges for additional security.
+
     <Note>
       GitHub's IP ranges: [https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/about-githubs-ip-addresses](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/about-githubs-ip-addresses)
     </Note>
@@ -357,11 +338,7 @@ def _verify_signature(self, payload: bytes, signature: str) -> bool:
     - Repeated signature verification failures
     - Unusual event frequencies
     - Webhook errors
-    
-    ```bash
-    # Check for signature failures
-    grep "Invalid webhook signature" logs/bot.log
-    ```
+    - Database anomalies or corruption
   </Accordion>
 </AccordionGroup>
 
@@ -400,13 +377,8 @@ def _verify_signature(self, payload: bytes, signature: str) -> bool:
        - Check `X-Hub-Signature-256` header is forwarded
     
     **Debug**:
-    ```bash
-    # Check secret in container
-    docker-compose exec audit-bot env | grep WEBHOOK_SECRET
-    
-    # Test signature locally
-    echo -n '{"test":true}' | openssl dgst -sha256 -hmac "your_secret"
-    ```
+    - Check secret in container: `docker-compose exec audit-bot env | grep WEBHOOK_SECRET`
+    - Test signature locally: `echo -n '{"test":true}' | openssl dgst -sha256 -hmac "your_secret"`
   </Accordion>
   
   <Accordion title="Events not triggering actions">
@@ -414,9 +386,7 @@ def _verify_signature(self, payload: bytes, signature: str) -> bool:
     
     **Check**:
     1. **Bot logs for errors**
-       ```bash
-       docker-compose logs -f | grep -i error
-       ```
+       - Run: `docker-compose logs -f | grep -i error`
     
     2. **Event type**
        - Only `push` events trigger actions
@@ -437,15 +407,7 @@ def _verify_signature(self, payload: bytes, signature: str) -> bool:
        - Webhooks require POST method
        - Health check uses GET method
     
-    **Test**:
-    ```bash
-    # Test POST to webhook endpoint
-    curl -X POST https://your-url/webhook/github \
-      -H "Content-Type: application/json" \
-      -H "X-GitHub-Event: ping" \
-      -H "X-Hub-Signature-256: sha256=test" \
-      -d '{"zen":"test"}'
-    ```
+    **Test**: Send a POST request to your webhook endpoint with GitHub headers to verify it responds correctly.
   </Accordion>
 </AccordionGroup>
 
@@ -473,7 +435,7 @@ def on_solidity_change(event_data: dict):
     """Custom Solidity change handler."""
     # Add your custom logic here
     pass
-```
+```python
 
 ### Webhook Testing
 

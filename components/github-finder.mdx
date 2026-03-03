@@ -16,7 +16,7 @@ github_finder = GitHubFinder(
     basescan_api_key=config.basescan_api_key,
     github_token=None  # Optional for higher rate limits
 )
-```
+```python
 
 ### Parameters
 
@@ -36,7 +36,7 @@ Finds GitHub repository for a contract using multiple strategies.
 
 ```python
 repo_url = github_finder.find_repo(contract_address, metadata)
-```
+```python
 
 **Parameters:**
 - `contract_address` (str): Contract address
@@ -56,7 +56,7 @@ Retrieves detailed repository information from GitHub.
 
 ```python
 repo_info = github_finder.get_repo_info(repo_url)
-```
+```python
 
 **Returns:** `dict` with keys:
 - `full_name`: Repository full name (owner/repo)
@@ -76,7 +76,7 @@ Retrieves the latest commit from a repository.
 
 ```python
 commit_info = github_finder.get_latest_commit(repo_url, branch="main")
-```
+```python
 
 **Parameters:**
 - `repo_url` (str): GitHub repository URL
@@ -97,7 +97,7 @@ Searches Basescan verified source code for GitHub URLs.
 
 ```python
 repo_url = github_finder._search_basescan_source(address)
-```
+```python
 
 ### _extract_github_url()
 
@@ -105,7 +105,7 @@ Extracts and validates GitHub URLs from text using regex patterns.
 
 ```python
 repo_url = github_finder._extract_github_url(source_code)
-```
+```python
 
 ### _validate_github_url()
 
@@ -113,7 +113,7 @@ Verifies that a GitHub URL points to a valid repository.
 
 ```python
 is_valid = github_finder._validate_github_url(url)
-```
+```python
 
 ### _search_github_by_address()
 
@@ -121,7 +121,7 @@ SearchGitHub code for the contract address.
 
 ```python
 repo_url = github_finder._search_github_by_address(address)
-```
+```python
 
 ### _search_github_by_name()
 
@@ -129,7 +129,7 @@ Search GitHub repositories by contract name.
 
 ```python
 repo_url = github_finder._search_github_by_name(contract_name)
-```
+```python
 
 ### _repo_has_solidity()
 
@@ -137,7 +137,7 @@ Checks if a repository contains Solidity files.
 
 ```python
 has_solidity = github_finder._repo_has_solidity("owner/repo")
-```
+```python
 
 ## Usage Example
 
@@ -148,7 +148,7 @@ From `bot.py:212-216`:
 repo_url = None
 if metadata:
     repo_url = self.github_finder.find_repo(address, metadata)
-```
+```python
 
 From `webhook.py:316-350` (getting commit info):
 
@@ -188,7 +188,7 @@ def get_latest_commit(self, repo_url: str, branch: str = "main") -> Optional[dic
     except Exception as e:
         logger.error(f"Error getting latest commit: {e}")
         return None
-```
+```python
 
 ## URL Pattern Matching
 
@@ -199,7 +199,7 @@ patterns = [
     r'https?://github\.com/([\w\-]+)/([\w\-\.]+)',
     r'github\.com/([\w\-]+)/([\w\-\.]+)',
 ]
-```
+```python
 
 URLs are automatically:
 - Cleaned of `.git` suffixes
@@ -216,7 +216,7 @@ URLs are automatically:
 ```python
 self.rate_limit_delay = 0.2  # 200ms between requests
 time.sleep(self.rate_limit_delay)  # Applied before each API call
-```
+```python
 
 ## Features
 
@@ -253,7 +253,7 @@ try:
 except Exception as e:
     logger.error(f"Error searching: {e}")
     return None
-```
+```python
 
 <Tip>
   For best results, provide contract metadata from the scanner. This gives the finder more context for accurate repository discovery.

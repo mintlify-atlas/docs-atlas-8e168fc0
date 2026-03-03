@@ -11,7 +11,7 @@ The `SolidityAuditor` class uses Anthropic's Claude AI to perform automated secu
 
 ```python
 from auditor import SolidityAuditor
-```
+```python
 
 ## Initialization
 
@@ -30,7 +30,7 @@ auditor = SolidityAuditor(
     anthropic_api_key="your_api_key",
     temp_dir=Path("./temp/audits")
 )
-```
+```python
 
 ## Methods
 
@@ -44,7 +44,7 @@ Perform a full security audit of a GitHub repository.
 
 ```python
 report = auditor.audit_repo("https://github.com/owner/repo")
-```
+```python
 
 <ResponseField name="return" type="FullAuditReport">
   Complete audit report containing:
@@ -90,7 +90,7 @@ contract MyContract {
 '''
 
 report = auditor.audit_source_code(source, "MyContract")
-```
+```python
 
 <ResponseField name="return" type="FullAuditReport">
   Audit report (same structure as audit_repo)
@@ -110,7 +110,7 @@ Audit a single Solidity file.
 from pathlib import Path
 
 result = auditor.audit_file(Path("./contracts/MyContract.sol"))
-```
+```python
 
 <ResponseField name="return" type="AuditResult">
   Result for single file containing:
@@ -129,7 +129,7 @@ Clone a GitHub repository to temporary directory.
 
 ```python
 repo_path = auditor.clone_repo("https://github.com/owner/repo")
-```
+```python
 
 <ResponseField name="return" type="Path">
   Path to cloned repository
@@ -147,7 +147,7 @@ Find all Solidity files in a repository.
 
 ```python
 sol_files = auditor.find_solidity_files(Path("./repo"))
-```
+```python
 
 <ResponseField name="return" type="list[Path]">
   List of paths to Solidity files. Excludes test files, mocks, and node_modules.
@@ -169,7 +169,7 @@ Remove a cloned repository.
 
 ```python
 auditor.cleanup(Path("./temp/repo"))
-```
+```python
 
 ## Data Classes
 
@@ -179,7 +179,7 @@ Represents a single security finding.
 
 ```python
 from auditor import Finding
-```
+```python
 
 <ParamField path="severity" type="str">
   Severity level: "Critical", "High", "Medium", or "Low"
@@ -207,7 +207,7 @@ Result of auditing a single file.
 
 ```python
 from auditor import AuditResult
-```
+```python
 
 <ParamField path="file_path" type="str">
   Path to the audited file
@@ -227,7 +227,7 @@ Complete audit report for a repository or source code.
 
 ```python
 from auditor import FullAuditReport
-```
+```python
 
 <ParamField path="repo_url" type="str">
   Repository URL or "direct_source" for source code audits
@@ -312,7 +312,7 @@ for finding in report.findings:
         print(f"   {finding.description}")
         print(f"   Location: {finding.location}")
         print(f"   Fix: {finding.recommendation}")
-```
+```python
 
 ## Configuration
 

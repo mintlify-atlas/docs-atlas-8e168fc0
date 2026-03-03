@@ -25,7 +25,7 @@ class BaseChainScanner:
 
         if not self.w3.is_connected():
             raise ConnectionError(f"Failed to connect to Base RPC at {rpc_url}")
-```
+```python
 
 **Key Parameters:**
 - `rpc_url` - Base blockchain RPC endpoint (e.g., Alchemy, Infura)
@@ -55,7 +55,7 @@ def scan_blocks(self, start_block: int, end_block: int) -> list[ContractDeployme
                     deployments.append(deployment)
     
     return deployments
-```
+```python
 
 <Info>
 In Ethereum and Base, contract creation transactions have `to: null`, while regular transactions specify a recipient address.
@@ -97,7 +97,7 @@ def _process_contract_creation(
     )
     
     return deployment
-```
+```python
 
 ### ContractDeployment Data Structure
 
@@ -111,7 +111,7 @@ class ContractDeployment:
     block_number: int     # Block number where deployed
     timestamp: datetime   # Block timestamp
     bytecode_size: int    # Size of deployed bytecode
-```
+```python
 
 ## Contract Verification
 
@@ -136,7 +136,7 @@ def is_contract_verified(self, address: str) -> bool:
     data = response.json()
     # Status "1" means ABI is available (verified)
     return data.get("status") == "1"
-```
+```python
 
 ### Fetching Source Code
 
@@ -173,7 +173,7 @@ def get_contract_source(self, address: str) -> Optional[dict]:
             }
     
     return None
-```
+```python
 
 <Warning>
 Basescan returns source code in different formats:
@@ -211,7 +211,7 @@ def _extract_github_url(self, source_code: str) -> Optional[str]:
             return url
     
     return None
-```
+```python
 
 ## Error Handling and Resilience
 
@@ -234,7 +234,7 @@ def _retry_on_failure(self, func, *args, **kwargs):
     
     logger.error(f"All {self.max_retries} attempts failed: {last_error}")
     raise last_error
-```
+```python
 
 **Retry Pattern:**
 - Attempt 1: Immediate
@@ -255,7 +255,7 @@ def get_block_timestamp(self, block_number: int) -> datetime:
     """Get timestamp for a block."""
     block = self._retry_on_failure(lambda: self.w3.eth.get_block(block_number))
     return datetime.utcfromtimestamp(block["timestamp"])
-```
+```python
 
 ## Scanning Strategy
 
@@ -285,7 +285,7 @@ def _scan_for_contracts(self) -> list[ContractDeployment]:
     self.last_block_scanned = latest_block
     
     return deployments
-```
+```python
 
 ### Scan Intervals
 
@@ -300,7 +300,7 @@ while self.running:
     
     # Wait for next cycle
     time.sleep(self.config.scan_interval_minutes * 60)
-```
+```python
 
 <Tip>
 **Recommended intervals:**
@@ -319,7 +319,7 @@ The `min_contract_size` parameter filters out trivial contracts:
 if bytecode_size < self.min_contract_size:
     logger.debug(f"Skipping small contract {contract_address} (size: {bytecode_size})")
     return None
-```
+```python
 
 This avoids auditing:
 - Test contracts
@@ -334,7 +334,7 @@ The scanner processes multiple blocks in a single cycle:
 ```python
 # Scan up to 100 blocks per cycle (configurable)
 deployments = self.scanner.scan_blocks(start_block, end_block)
-```
+```python
 
 ## Integration with Main Bot
 
@@ -354,7 +354,7 @@ deployments = self._scan_for_contracts()
 # Process each deployment
 for deployment in deployments:
     self._process_deployment(deployment)
-```
+```python
 
 ## Monitoring Metrics
 

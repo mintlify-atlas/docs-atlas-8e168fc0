@@ -16,7 +16,7 @@ auditor = SolidityAuditor(
     anthropic_api_key=config.anthropic_api_key,
     temp_dir=config.temp_dir
 )
-```
+```python
 
 ### Parameters
 
@@ -36,7 +36,7 @@ Performs a full audit of a GitHub repository.
 
 ```python
 report = auditor.audit_repo(repo_url)
-```
+```python
 
 **Parameters:**
 - `repo_url` (str): GitHub repository URL
@@ -49,7 +49,7 @@ Audits source code directly without cloning a repository.
 
 ```python
 report = auditor.audit_source_code(source_code, contract_name)
-```
+```python
 
 **Parameters:**
 - `source_code` (str): Solidity source code to audit
@@ -63,7 +63,7 @@ Clones a GitHub repository for auditing.
 
 ```python
 repo_path = auditor.clone_repo(repo_url)
-```
+```python
 
 **Parameters:**
 - `repo_url` (str): GitHub repository URL
@@ -76,7 +76,7 @@ Finds all Solidity files in a repository.
 
 ```python
 sol_files = auditor.find_solidity_files(repo_path)
-```
+```python
 
 **Parameters:**
 - `repo_path` (Path): Path to repository
@@ -97,7 +97,7 @@ class Finding:
     description: str           # Detailed explanation
     location: Optional[str]    # Function or line reference
     recommendation: Optional[str]  # How to fix
-```
+```python
 
 ### FullAuditReport
 
@@ -117,7 +117,7 @@ class FullAuditReport:
     findings: list[Finding]
     summary: str
     error: Optional[str]
-```
+```python
 
 ## Vulnerability Detection
 
@@ -225,7 +225,7 @@ def _audit_contract(self, contract: Contract, repo_url: str):
 
     except Exception as e:
         logger.error(f"Error auditing contract: {e}")
-```
+```python
 
 ### Auditing from Source Code
 
@@ -252,7 +252,7 @@ def _audit_from_source(self, contract: Contract, metadata: dict):
 
     except Exception as e:
         logger.error(f"Error auditing from source: {e}")
-```
+```python
 
 ## Configuration
 
@@ -295,4 +295,4 @@ The auditor automatically cleans up cloned repositories after auditing:
 
 ```python
 auditor.cleanup(repo_path)  # Called automatically in audit_repo()
-```
+```python

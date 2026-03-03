@@ -163,7 +163,7 @@ Loads configuration from environment variables. Validates that all required fiel
 
 ```python
 config = Config.from_env()
-```
+```python
 
 **Raises:** `ValueError` if any required environment variables are missing.
 
@@ -182,7 +182,7 @@ Validates configuration values to ensure they are within acceptable ranges.
 
 ```python
 config.validate()  # Returns True or raises ValueError
-```
+```python
 
 **Validation Rules:**
 - `base_rpc_url` must start with `"http"` or `"https"`
@@ -199,14 +199,14 @@ Convenience function that loads and validates configuration in one step.
 from config import get_config
 
 config = get_config()
-```
+```python
 
 This is equivalent to:
 
 ```python
 config = Config.from_env()
 config.validate()
-```
+```python
 
 ## Usage Example
 
@@ -242,7 +242,7 @@ LOG_LEVEL=INFO
 # Paths
 DATABASE_PATH=./data/bot.db
 TEMP_DIR=./temp_repos
-```
+```python
 
 ### Loading in Application
 
@@ -273,7 +273,7 @@ auditor = SolidityAuditor(
     anthropic_api_key=config.anthropic_api_key,
     temp_dir=config.temp_dir
 )
-```
+```python
 
 ### Accessing Configuration Values
 
@@ -288,7 +288,7 @@ print(f"RPC URL: {config.base_rpc_url}")
 # Use in conditionals
 if config.webhook_secret:
     print("Webhook authentication enabled")
-```
+```python
 
 ## Environment Variables Reference
 

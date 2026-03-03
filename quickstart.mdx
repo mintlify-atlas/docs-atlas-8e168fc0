@@ -157,7 +157,7 @@ Once running, the bot operates autonomously:
 
 ### Successful Contract Audit
 
-```
+```log
 2026-03-03 10:15:23,456 - __main__ - INFO - Processing new contract: 0x1234567890abcdef1234567890abcdef12345678
 2026-03-03 10:15:24,567 - __main__ - INFO - Saved contract 0x1234... (verified: True, repo: https://github.com/user/token)
 2026-03-03 10:15:25,678 - __main__ - INFO - Auditing contract 0x1234... from repo https://github.com/user/token
@@ -171,7 +171,7 @@ Once running, the bot operates autonomously:
 
 ### Unverified Contract (Skipped)
 
-```
+```log
 2026-03-03 10:20:15,345 - __main__ - INFO - Processing new contract: 0xabcdef1234567890abcdef1234567890abcdef12
 2026-03-03 10:20:16,456 - __main__ - INFO - Saved contract 0xabcdef... (verified: False, repo: None)
 ```
@@ -191,19 +191,19 @@ BLOCKS_TO_SCAN=10
 
 Send a direct message to your Twitter bot account:
 
-```
+```text
 audit 0x1234567890abcdef1234567890abcdef12345678
 ```
 
 The bot should respond with:
 
-```
+```text
 Checking contract 0x1234567890abcdef1234567890abcdef12345678...
 ```
 
 And after the audit completes:
 
-```
+```text
 Audit complete for 0x1234567890abcdef1234567890abcdef12345678. Check our timeline for results.
 ```
 

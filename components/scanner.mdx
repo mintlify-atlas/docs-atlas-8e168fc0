@@ -17,7 +17,7 @@ scanner = BaseChainScanner(
     basescan_api_key=config.basescan_api_key,
     min_contract_size=config.min_contract_size
 )
-```
+```python
 
 ### Parameters
 
@@ -41,7 +41,7 @@ Scans a range of blocks for contract deployments.
 
 ```python
 deployments = scanner.scan_blocks(start_block, end_block)
-```
+```python
 
 **Parameters:**
 - `start_block` (int): Starting block number
@@ -55,7 +55,7 @@ Retrieves the latest block number from the blockchain.
 
 ```python
 latest_block = scanner.get_latest_block()
-```
+```python
 
 **Returns:** `int` - Latest block number
 
@@ -65,7 +65,7 @@ Checks if a contract is verified on Basescan.
 
 ```python
 is_verified = scanner.is_contract_verified(address)
-```
+```python
 
 **Parameters:**
 - `address` (str): Contract address to check
@@ -78,7 +78,7 @@ Retrieves verified contract source code from Basescan.
 
 ```python
 source_info = scanner.get_contract_source(address)
-```
+```python
 
 **Returns:** `dict` with keys:
 - `contract_name`: Name of the contract
@@ -95,7 +95,7 @@ Retrieves contract metadata including extracted GitHub URLs.
 
 ```python
 metadata = scanner.get_contract_metadata(address)
-```
+```python
 
 **Returns:** `dict` with contract information and extracted social links
 
@@ -110,7 +110,7 @@ class ContractDeployment:
     block_number: int         # Block number of deployment
     timestamp: datetime       # Deployment timestamp
     bytecode_size: int        # Size of deployed bytecode
-```
+```python
 
 ## Usage Example
 
@@ -141,7 +141,7 @@ def _scan_for_contracts(self) -> list[ContractDeployment]:
     except Exception as e:
         logger.error(f"Error scanning blocks: {e}")
         return []
-```
+```python
 
 ## Features
 

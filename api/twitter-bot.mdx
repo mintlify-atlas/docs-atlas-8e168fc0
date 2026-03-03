@@ -11,7 +11,7 @@ The `TwitterBot` class manages all Twitter interactions including posting audit 
 
 ```python
 from twitter_bot import TwitterBot, TwitterCredentials
-```
+```python
 
 ## Initialization
 
@@ -51,7 +51,7 @@ creds = TwitterCredentials(
 )
 
 bot = TwitterBot(creds)
-```
+```python
 
 ## Methods
 
@@ -73,7 +73,7 @@ Post an audit result as a tweet.
 
 ```python
 tweet = bot.post_audit(contract, audit)
-```
+```python
 
 <ResponseField name="return" type="Tweet | None">
   Tweet record if posted successfully, None if failed. Contains:
@@ -86,7 +86,7 @@ tweet = bot.post_audit(contract, audit)
 </ResponseField>
 
 **Tweet Format:**
-```
+```python
 🔍 New audit: {contract_name}
 
 📊 Findings: {total} issue(s) found
@@ -96,7 +96,7 @@ tweet = bot.post_audit(contract, audit)
 📁 Repo: {github_repo}
 
 #BaseChain #SmartContractSecurity
-```
+```python
 
 ### post_thread(messages)
 
@@ -112,7 +112,7 @@ tweet_ids = bot.post_thread([
     "Second tweet replying to first",
     "Third tweet replying to second"
 ])
-```
+```python
 
 <ResponseField name="return" type="list[str]">
   List of tweet IDs posted. Empty list if all failed.
@@ -136,7 +136,7 @@ Post detailed findings as a Twitter thread.
 
 ```python
 tweet_ids = bot.post_detailed_findings(contract, audit, findings)
-```
+```python
 
 <ResponseField name="return" type="list[str]">
   List of tweet IDs in the thread
@@ -170,14 +170,14 @@ tweet = bot.post_repo_update(
     "Fix critical security issue",
     "https://github.com/owner/repo/commit/abc123"
 )
-```
+```python
 
 <ResponseField name="return" type="Tweet | None">
   Tweet record if posted successfully, None if failed
 </ResponseField>
 
 **Tweet Format:**
-```
+```python
 🔄 Update detected: {repo_name}
 
 📝 {commit_message}
@@ -185,7 +185,7 @@ tweet = bot.post_repo_update(
 🔗 {commit_url}
 
 #BaseChain #Development
-```
+```python
 
 ### post_daily_summary(stats)
 
@@ -212,14 +212,14 @@ stats = {
 }
 
 tweet = bot.post_daily_summary(stats)
-```
+```python
 
 <ResponseField name="return" type="Tweet | None">
   Tweet record if posted successfully, None if failed
 </ResponseField>
 
 **Tweet Format:**
-```
+```python
 📊 Daily Audit Summary
 
 🔍 Contracts scanned: {n}
@@ -230,7 +230,7 @@ tweet = bot.post_daily_summary(stats)
    - Medium: {n}
 
 #BaseChain #SmartContractSecurity
-```
+```python
 
 ### check_dm_commands()
 
@@ -238,7 +238,7 @@ Check direct messages for audit commands.
 
 ```python
 commands = bot.check_dm_commands()
-```
+```python
 
 <ResponseField name="return" type="list[dict]">
   List of command dictionaries. Each contains:
@@ -258,7 +258,7 @@ for cmd in commands:
         address = cmd["address"]
         # Process audit request...
         bot.send_dm(cmd["sender_id"], f"Auditing {address}...")
-```
+```python
 
 ### send_dm(user_id, message)
 
@@ -274,7 +274,7 @@ Send a direct message to a user.
 
 ```python
 success = bot.send_dm("123456789", "Your audit is complete!")
-```
+```python
 
 <ResponseField name="return" type="bool">
   True if message sent successfully, False otherwise
@@ -324,7 +324,7 @@ if tweet:
 commands = bot.check_dm_commands()
 for cmd in commands:
     print(f"Received command: {cmd['type']} {cmd['address']}")
-```
+```python
 
 ## Character Limits
 

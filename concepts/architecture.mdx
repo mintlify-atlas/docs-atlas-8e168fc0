@@ -24,7 +24,7 @@ graph TB
     C --> J[GitHub API]
     D --> K[Anthropic Claude API]
     E --> L[Twitter API]
-```
+```python
 
 ### 1. AuditBot Orchestrator
 
@@ -41,7 +41,7 @@ class AuditBot:
         self.github_finder = GitHubFinder(...)
         self.auditor = SolidityAuditor(...)
         self.twitter_bot = TwitterBot(...)
-```
+```python
 
 **Key Responsibilities:**
 - Manages the main scan cycle loop
@@ -59,7 +59,7 @@ class BaseChainScanner:
     def __init__(self, rpc_url: str, basescan_api_key: str, min_contract_size: int = 100):
         self.w3 = Web3(Web3.HTTPProvider(rpc_url))
         self.basescan_api_key = basescan_api_key
-```
+```python
 
 See [Blockchain Monitoring](/concepts/blockchain-monitoring) for detailed implementation.
 
@@ -71,7 +71,7 @@ Discovery engine for finding GitHub repositories associated with deployed contra
 class GitHubFinder:
     def find_repo(self, contract_address: str, metadata: Optional[dict] = None) -> Optional[str]:
         # Multi-strategy search: source code, metadata, GitHub search
-```
+```python
 
 See [GitHub Discovery](/concepts/github-discovery) for detailed strategies.
 
@@ -85,7 +85,7 @@ class SolidityAuditor:
 
     def __init__(self, anthropic_api_key: str, temp_dir: Optional[Path] = None):
         self.client = anthropic.Anthropic(api_key=anthropic_api_key)
-```
+```python
 
 See [AI-Powered Auditing](/concepts/ai-auditing) for Claude integration details.
 
@@ -100,7 +100,7 @@ class TwitterBot:
         self.api = tweepy.API(self.auth, wait_on_rate_limit=True)
         # OAuth 2.0 for v2 endpoints
         self.client = tweepy.Client(...)
-```
+```python
 
 See [Twitter Integration](/concepts/twitter-integration) for posting workflows.
 
@@ -147,7 +147,7 @@ sequenceDiagram
         
         Bot->>DB: add_contract(contract)
     end
-```
+```python
 
 ### Scan Cycle
 
@@ -167,7 +167,7 @@ def run(self):
         # Wait for next cycle
         if self.running:
             time.sleep(self.config.scan_interval_minutes * 60)
-```
+```python
 
 Each cycle:
 1. **Scans blocks** for new contract deployments
@@ -184,7 +184,7 @@ config = get_config()  # Loads from .env file
 
 bot = AuditBot(config)
 bot.run()
-```
+```python
 
 **Key Configuration:**
 - `BASE_RPC_URL` - Base blockchain RPC endpoint
@@ -210,7 +210,7 @@ def _retry_on_failure(self, func, *args, **kwargs):
             if attempt < self.max_retries - 1:
                 delay = self.retry_delay * (2 ** attempt)  # Exponential backoff
                 time.sleep(delay)
-```
+```python
 
 ### Component Isolation
 
@@ -223,7 +223,7 @@ for deployment in deployments:
     except Exception as e:
         logger.error(f"Error processing deployment {deployment.address}: {e}")
         # Continue with next deployment
-```
+```python
 
 ### Rate Limiting
 
@@ -246,7 +246,7 @@ if config.webhook_secret:
         port=config.webhook_port
     )
     self.webhook_server.start(threaded=True)
-```
+```python
 
 ## Performance Characteristics
 
@@ -272,7 +272,7 @@ python bot.py
 
 # Or as a systemd service
 systemctl start base-audit-bot
-```
+```python
 
 **Recommended deployment:**
 - VPS or cloud instance with persistent storage

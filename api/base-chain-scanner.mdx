@@ -11,7 +11,7 @@ The `BaseChainScanner` class scans the Base blockchain for new contract deployme
 
 ```python
 from scanner import BaseChainScanner
-```
+```python
 
 ## Initialization
 
@@ -33,7 +33,7 @@ scanner = BaseChainScanner(
     basescan_api_key="your_api_key",
     min_contract_size=100
 )
-```
+```python
 
 ## Methods
 
@@ -43,7 +43,7 @@ Retrieve the latest block number on Base chain.
 
 ```python
 latest = scanner.get_latest_block()
-```
+```python
 
 <ResponseField name="return" type="int">
   The latest block number
@@ -59,7 +59,7 @@ Get the timestamp for a specific block.
 
 ```python
 timestamp = scanner.get_block_timestamp(12345678)
-```
+```python
 
 <ResponseField name="return" type="datetime">
   Block timestamp as a datetime object (UTC)
@@ -79,7 +79,7 @@ Scan a range of blocks for contract deployments.
 
 ```python
 deployments = scanner.scan_blocks(12345000, 12345100)
-```
+```python
 
 <ResponseField name="return" type="list[ContractDeployment]">
   List of contract deployments found in the block range. Each deployment contains:
@@ -103,7 +103,7 @@ Convenience method to scan the most recent blocks.
 
 ```python
 deployments = scanner.scan_recent_blocks(num_blocks=50)
-```
+```python
 
 <ResponseField name="return" type="list[ContractDeployment]">
   List of contract deployments found in recent blocks
@@ -120,7 +120,7 @@ Check if a contract is verified on Basescan.
 ```python
 if scanner.is_contract_verified("0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"):
     print("Contract is verified")
-```
+```python
 
 <ResponseField name="return" type="bool">
   True if contract is verified, False otherwise
@@ -136,7 +136,7 @@ Retrieve verified contract source code from Basescan.
 
 ```python
 source_info = scanner.get_contract_source("0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb")
-```
+```python
 
 <ResponseField name="return" type="dict | None">
   Dictionary containing source code information, or None if not verified:
@@ -159,7 +159,7 @@ Get contract metadata including social links and GitHub URL.
 
 ```python
 metadata = scanner.get_contract_metadata("0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb")
-```
+```python
 
 <ResponseField name="return" type="dict | None">
   Dictionary containing metadata, or None if not available:
@@ -180,7 +180,7 @@ Get information about a deployer address.
 
 ```python
 info = scanner.get_deployer_info("0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb")
-```
+```python
 
 <ResponseField name="return" type="dict">
   Dictionary containing deployer information:
@@ -193,7 +193,7 @@ info = scanner.get_deployer_info("0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb")
 
 ```python
 from scanner import ContractDeployment
-```
+```python
 
 <ParamField path="address" type="str">
   Contract address (checksummed)
@@ -245,7 +245,7 @@ for deployment in deployments:
         print(f"  Name: {metadata['contract_name']}")
         if metadata['github_url']:
             print(f"  GitHub: {metadata['github_url']}")
-```
+```python
 
 ## Error Handling
 

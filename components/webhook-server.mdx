@@ -18,7 +18,7 @@ server = WebhookServer(
     on_push=handle_push,
     on_solidity_change=handle_solidity_change
 )
-```
+```python
 
 ### Parameters
 
@@ -46,7 +46,7 @@ Starts the webhook server.
 
 ```python
 server.start(threaded=True)
-```
+```python
 
 **Parameters:**
 - `threaded` (bool): If True, runs server in a daemon thread
@@ -57,7 +57,7 @@ Stops the webhook server.
 
 ```python
 server.stop()
-```
+```python
 
 <Note>
   The server runs as a daemon thread, so it automatically stops when the main process exits.
@@ -75,7 +75,7 @@ Health check endpoint.
   "status": "healthy",
   "timestamp": "2024-01-15T10:30:00.000000"
 }
-```
+```python
 
 ### POST /webhook/github
 
@@ -105,7 +105,7 @@ event_data = {
     "solidity_changed": True,
     "modified_files": ["contracts/Token.sol", "contracts/Vault.sol"]
 }
-```
+```python
 
 ## Callback Functions
 
@@ -122,7 +122,7 @@ def on_solidity_change(event_data: dict):
     """Handle Solidity file changes."""
     repo_url = event_data["repo_url"]
     # Trigger re-audit
-```
+```python
 
 ## Usage Example
 
@@ -140,7 +140,7 @@ if config.webhook_secret:
         port=config.webhook_port
     )
     logger.info(f"Webhook server configured on port {config.webhook_port}")
-```
+```python
 
 From `bot.py:108-111`:
 
@@ -149,7 +149,7 @@ From `bot.py:108-111`:
 if self.webhook_server:
     self.webhook_server.start(threaded=True)
     logger.info("Webhook server started")
-```
+```python
 
 ## Helper Function: create_webhook_handler()
 
@@ -165,7 +165,7 @@ server = create_webhook_handler(
     webhook_secret="your-secret",
     port=5000
 )
-```
+```python
 
 ### Implementation
 
@@ -234,7 +234,7 @@ def create_webhook_handler(
         on_push=on_push,
         on_solidity_change=on_solidity_change
     )
-```
+```python
 
 ## Signature Verification
 
@@ -253,7 +253,7 @@ def _verify_signature(self, payload: bytes, signature: str) -> bool:
     ).hexdigest()
 
     return hmac.compare_digest(signature, expected_signature)
-```
+```python
 
 <Warning>
   Always use a strong webhook secret and verify signatures. Unverified webhooks can be exploited for malicious purposes.
@@ -273,7 +273,7 @@ for commit in commits:
         if file.endswith(".sol"):
             solidity_changed = True
             break
-```
+```python
 
 When Solidity files change, the `on_solidity_change` callback is triggered for automated re-audits.
 
@@ -312,12 +312,12 @@ Test the webhook with a health check:
 
 ```bash
 curl http://localhost:5000/health
-```
+```python
 
 Expected response:
 ```json
 {"status": "healthy", "timestamp": "..."}
-```
+```python
 
 ## Error Handling
 
@@ -333,7 +333,7 @@ The server includes comprehensive error handling:
 def handle_error(error):
     logger.error(f"Webhook error: {error}")
     return jsonify({"error": str(error)}), 500
-```
+```python
 
 <Info>
   The webhook server uses Flask with production-safe settings (debug=False, use_reloader=False) suitable for deployment.

@@ -11,7 +11,7 @@ The `GitHubFinder` class discovers GitHub repositories for smart contracts using
 
 ```python
 from github_finder import GitHubFinder
-```
+```python
 
 ## Initialization
 
@@ -28,7 +28,7 @@ finder = GitHubFinder(
     basescan_api_key="your_basescan_key",
     github_token="your_github_token"  # Optional but recommended
 )
-```
+```python
 
 ## Methods
 
@@ -49,7 +49,7 @@ repo_url = finder.find_repo(
     "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
     metadata={"contract_name": "MyToken"}
 )
-```
+```python
 
 <ResponseField name="return" type="str | None">
   GitHub repository URL if found, None otherwise
@@ -71,7 +71,7 @@ Get detailed information about a GitHub repository.
 
 ```python
 info = finder.get_repo_info("https://github.com/owner/repo")
-```
+```python
 
 <ResponseField name="return" type="dict | None">
   Repository information or None if not found:
@@ -104,7 +104,7 @@ commit = finder.get_latest_commit(
     "https://github.com/owner/repo",
     branch="main"
 )
-```
+```python
 
 <ResponseField name="return" type="dict | None">
   Commit information or None if not found:
@@ -220,7 +220,7 @@ if repo_url:
     print(f"By: {commit['author']} on {commit['date']}")
 else:
     print("No repository found")
-```
+```python
 
 ## Rate Limiting
 
@@ -233,11 +233,11 @@ else:
 
 The finder recognizes these GitHub URL patterns in source code:
 
-```
+```python
 https://github.com/owner/repo
 http://github.com/owner/repo
 github.com/owner/repo
-```
+```python
 
 URLs are automatically cleaned:
 - `/blob/...` paths removed

@@ -11,7 +11,7 @@ The `Database` class manages all persistent storage for the Base Audit Bot using
 
 ```python
 from models import Database
-```
+```python
 
 ## Initialization
 
@@ -24,7 +24,7 @@ from pathlib import Path
 from models import Database
 
 db = Database(Path("./data/audit_bot.db"))
-```
+```python
 
 ## Contract Operations
 
@@ -53,7 +53,7 @@ contract = Contract(
 )
 
 contract_id = db.add_contract(contract)
-```
+```python
 
 <ResponseField name="return" type="int">
   Database ID of the inserted contract
@@ -69,7 +69,7 @@ Retrieve a contract by its address.
 
 ```python
 contract = db.get_contract_by_address("0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb")
-```
+```python
 
 <ResponseField name="return" type="Contract | None">
   Contract object if found, None otherwise
@@ -92,7 +92,7 @@ db.update_contract_repo(
     "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
     "https://github.com/owner/repo"
 )
-```
+```python
 
 ### update_contract_audit_time(address)
 
@@ -104,7 +104,7 @@ Update a contract's last audit timestamp to current time.
 
 ```python
 db.update_contract_audit_time("0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb")
-```
+```python
 
 ### get_unaudited_contracts(limit)
 
@@ -116,7 +116,7 @@ Get contracts that haven't been audited yet but have a repository URL.
 
 ```python
 contracts = db.get_unaudited_contracts(limit=20)
-```
+```python
 
 <ResponseField name="return" type="list[Contract]">
   List of unaudited contracts, ordered by deployment time (newest first)
@@ -128,7 +128,7 @@ Get count of contracts added to database today.
 
 ```python
 count = db.get_contracts_scanned_today()
-```
+```python
 
 <ResponseField name="return" type="int">
   Number of contracts scanned today
@@ -161,7 +161,7 @@ audit = Audit(
 )
 
 audit_id = db.add_audit(audit)
-```
+```python
 
 <ResponseField name="return" type="int">
   Database ID of the inserted audit
@@ -177,7 +177,7 @@ Get the most recent audit for a contract.
 
 ```python
 audit = db.get_audit_by_contract_id(1)
-```
+```python
 
 <ResponseField name="return" type="Audit | None">
   Most recent Audit object for the contract, or None if no audits exist
@@ -189,7 +189,7 @@ Get audit statistics for today.
 
 ```python
 stats = db.get_daily_stats()
-```
+```python
 
 <ResponseField name="return" type="dict">
   Dictionary containing:
@@ -224,7 +224,7 @@ tweet = Tweet(
 )
 
 tweet_id = db.add_tweet(tweet)
-```
+```python
 
 <ResponseField name="return" type="int">
   Database ID of the inserted tweet record
@@ -249,7 +249,7 @@ db.add_monitored_repo(
     "https://github.com/owner/repo",
     contract_id=1
 )
-```
+```python
 
 ### get_monitored_repos()
 
@@ -257,7 +257,7 @@ Get all monitored repositories.
 
 ```python
 repos = db.get_monitored_repos()
-```
+```python
 
 <ResponseField name="return" type="list[dict]">
   List of repository records, each containing:
@@ -285,7 +285,7 @@ db.update_repo_commit(
     "https://github.com/owner/repo",
     "abc123def456..."
 )
-```
+```python
 
 ## Blocklist Operations
 
@@ -300,7 +300,7 @@ Check if an address is blocklisted.
 ```python
 if db.is_blocklisted("0xspammer..."):
     print("Address is blocklisted")
-```
+```python
 
 <ResponseField name="return" type="bool">
   True if address is blocklisted, False otherwise
@@ -323,7 +323,7 @@ db.add_to_blocklist(
     "0xspammer...",
     reason="Known scam contract"
 )
-```
+```python
 
 ## Data Models
 
@@ -331,7 +331,7 @@ db.add_to_blocklist(
 
 ```python
 from models import Contract
-```
+```python
 
 <ParamField path="id" type="int | None">
   Database ID (None for new records)
@@ -373,7 +373,7 @@ from models import Contract
 
 ```python
 from models import Audit
-```
+```python
 
 <ParamField path="id" type="int | None">
   Database ID
@@ -415,7 +415,7 @@ from models import Audit
 
 ```python
 from models import Tweet
-```
+```python
 
 <ParamField path="id" type="int | None">
   Database ID
@@ -503,4 +503,4 @@ db.update_contract_audit_time(contract.address)
 stats = db.get_daily_stats()
 print(f"Audits today: {stats['total_audits']}")
 print(f"Critical issues: {stats['total_critical']}")
-```
+```python
