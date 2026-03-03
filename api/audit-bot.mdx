@@ -1,0 +1,202 @@
+---
+title: "AuditBot"
+description: "Main bot orchestrator that coordinates blockchain scanning, GitHub discovery, smart contract auditing, and Twitter posting."
+---
+
+## Overview
+
+The `AuditBot` class is the central orchestrator for the Base Audit Bot. It initializes and coordinates all components including the blockchain scanner, GitHub finder, auditor, and Twitter bot.
+
+## Class Definition
+
+```python
+from config import Config
+from bot import AuditBot
+```
+
+## Initialization
+
+<ParamField path="config" type="Config" required>
+  Configuration object containing all necessary API keys and settings
+</ParamField>
+
+```python
+bot = AuditBot(config)
+```
+
+### Configuration Requirements
+
+The `Config` object must include:
+- `database_path` - Path to SQLite database
+- `base_rpc_url` - Base chain RPC endpoint
+- `basescan_api_key` - Basescan API key
+- `anthropic_api_key` - Anthropic API key for auditing
+- `twitter_api_key`, `twitter_api_secret`, `twitter_access_token`, `twitter_access_secret`, `twitter_bearer_token` - Twitter credentials
+- `min_contract_size` - Minimum contract bytecode size to scan
+- `scan_interval_minutes` - Minutes between scan cycles
+- `blocks_to_scan` - Number of blocks to scan initially
+- `temp_dir` - Temporary directory for cloning repos
+- `webhook_secret` (optional) - Secret for webhook authentication
+- `webhook_port` (optional) - Port for webhook server
+
+## Methods
+
+### run()
+
+Starts the main bot loop and runs continuously until stopped.
+
+```python
+bot.run()
+```
+
+<ResponseField name="return" type="None">
+  This method runs indefinitely and does not return
+</ResponseField>
+
+**Behavior:**
+- Sets up signal handlers for graceful shutdown (SIGINT, SIGTERM)
+- Starts webhook server if configured
+- Runs scan cycles at the configured interval
+- Handles errors and continues running
+
+### shutdown()
+
+Gracefully shuts down the bot and all its components.
+
+```python
+bot.shutdown()
+```
+
+<ResponseField name="return" type="None">
+  Stops the bot and cleans up resources
+</ResponseField>
+
+**Behavior:**
+- Sets `running` flag to False
+- Stops webhook server if running
+- Allows current operations to complete
+
+## Internal Methods
+
+These methods are called internally by the bot but can be useful to understand:
+
+### _run_cycle()
+
+Executes a single scan cycle:
+1. Scans blockchain for new contract deployments
+2. Processes each deployment (audit, GitHub discovery)
+3. Checks for Twitter DM commands
+4. Posts daily summary if needed
+
+### _scan_for_contracts()
+
+Scans blockchain blocks for new contract deployments.
+
+<ResponseField name="return" type="list[ContractDeployment]">
+  List of newly deployed contracts found in the scan
+</ResponseField>
+
+### _process_deployment(deployment)
+
+Processes a single contract deployment:
+
+<ParamField path="deployment" type="ContractDeployment" required>
+  Contract deployment information from the scanner
+</ParamField>
+
+**Steps:**
+1. Checks if contract already exists in database
+2. Checks blocklist
+3. Verifies contract on Basescan
+4. Finds GitHub repository
+5. Creates contract record
+6. Performs audit if source code is available
+
+### _audit_contract(contract, repo_url)
+
+Audits a contract from its GitHub repository.
+
+<ParamField path="contract" type="Contract" required>
+  Contract database record
+</ParamField>
+
+<ParamField path="repo_url" type="str" required>
+  GitHub repository URL
+</ParamField>
+
+**Steps:**
+1. Calls auditor to analyze repository
+2. Saves audit results to database
+3. Posts results to Twitter
+4. Posts detailed thread for critical/high findings
+
+### _audit_from_source(contract, metadata)
+
+Audits a contract from its verified source code on Basescan.
+
+<ParamField path="contract" type="Contract" required>
+  Contract database record
+</ParamField>
+
+<ParamField path="metadata" type="dict" required>
+  Contract metadata including source code from Basescan
+</ParamField>
+
+### _check_dm_commands()
+
+Checks Twitter DMs for audit commands and processes them.
+
+**Supported Commands:**
+- `audit [address]` - Request audit for a specific contract address
+
+### _check_daily_summary()
+
+Posts daily summary tweet at midnight UTC if audits were performed.
+
+## Component Access
+
+The bot provides access to its initialized components:
+
+```python
+bot.db              # Database instance
+bot.scanner         # BaseChainScanner instance
+bot.github_finder   # GitHubFinder instance
+bot.auditor         # SolidityAuditor instance
+bot.twitter_bot     # TwitterBot instance
+bot.webhook_server  # WebhookServer instance (if configured)
+```
+
+## Example Usage
+
+```python
+from config import get_config
+from bot import AuditBot
+
+# Load configuration from environment
+config = get_config()
+
+# Initialize bot
+bot = AuditBot(config)
+
+# Run the bot (blocks until stopped)
+try:
+    bot.run()
+except KeyboardInterrupt:
+    bot.shutdown()
+```
+
+## Error Handling
+
+The bot includes comprehensive error handling:
+- Individual contract processing errors don't stop the bot
+- Network errors trigger automatic retries
+- All errors are logged with full stack traces
+- The bot continues running even after errors
+
+## Signal Handling
+
+The bot handles shutdown signals gracefully:
+- `SIGINT` (Ctrl+C) - Initiates graceful shutdown
+- `SIGTERM` - Initiates graceful shutdown
+
+This allows the bot to complete current operations and clean up resources before exiting.

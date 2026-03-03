@@ -1,0 +1,260 @@
+---
+title: GitHubFinder
+description: Discovers GitHub repositories for verified smart contracts
+---
+
+## Overview
+
+The `GitHubFinder` component discovers GitHub repositories associated with smart contracts using multiple search strategies. It extracts GitHub URLs from source code, searches the GitHub API, and validates repository existence.
+
+## Initialization
+
+```python
+from github_finder import GitHubFinder
+
+github_finder = GitHubFinder(
+    basescan_api_key=config.basescan_api_key,
+    github_token=None  # Optional for higher rate limits
+)
+```
+
+### Parameters
+
+<ParamField path="basescan_api_key" type="str" required>
+  API key for Basescan API access
+</ParamField>
+
+<ParamField path="github_token" type="str">
+  Optional GitHub personal access token for higher API rate limits
+</ParamField>
+
+## Key Methods
+
+### find_repo()
+
+Finds GitHub repository for a contract using multiple strategies.
+
+```python
+repo_url = github_finder.find_repo(contract_address, metadata)
+```
+
+**Parameters:**
+- `contract_address` (str): Contract address
+- `metadata` (dict, optional): Contract metadata from scanner
+
+**Returns:** `str | None` - GitHub repository URL if found
+
+**Search Strategies (in order):**
+1. Extract from metadata if already present
+2. Search Basescan verified source code comments
+3. Search GitHub for contract address
+4. Search GitHub for contract name
+
+### get_repo_info()
+
+Retrieves detailed repository information from GitHub.
+
+```python
+repo_info = github_finder.get_repo_info(repo_url)
+```
+
+**Returns:** `dict` with keys:
+- `full_name`: Repository full name (owner/repo)
+- `description`: Repository description
+- `stars`: Star count
+- `forks`: Fork count
+- `open_issues`: Open issue count
+- `default_branch`: Default branch name
+- `created_at`: Creation timestamp
+- `updated_at`: Last update timestamp
+- `clone_url`: Clone URL
+- `html_url`: Web URL
+
+### get_latest_commit()
+
+Retrieves the latest commit from a repository.
+
+```python
+commit_info = github_finder.get_latest_commit(repo_url, branch="main")
+```
+
+**Parameters:**
+- `repo_url` (str): GitHub repository URL
+- `branch` (str): Branch name (default: "main")
+
+**Returns:** `dict` with commit information:
+- `sha`: Commit SHA
+- `message`: Commit message
+- `author`: Author name
+- `date`: Commit date
+- `url`: Commit URL
+
+## Internal Methods
+
+### _search_basescan_source()
+
+Searches Basescan verified source code for GitHub URLs.
+
+```python
+repo_url = github_finder._search_basescan_source(address)
+```
+
+### _extract_github_url()
+
+Extracts and validates GitHub URLs from text using regex patterns.
+
+```python
+repo_url = github_finder._extract_github_url(source_code)
+```
+
+### _validate_github_url()
+
+Verifies that a GitHub URL points to a valid repository.
+
+```python
+is_valid = github_finder._validate_github_url(url)
+```
+
+### _search_github_by_address()
+
+SearchGitHub code for the contract address.
+
+```python
+repo_url = github_finder._search_github_by_address(address)
+```
+
+### _search_github_by_name()
+
+Search GitHub repositories by contract name.
+
+```python
+repo_url = github_finder._search_github_by_name(contract_name)
+```
+
+### _repo_has_solidity()
+
+Checks if a repository contains Solidity files.
+
+```python
+has_solidity = github_finder._repo_has_solidity("owner/repo")
+```
+
+## Usage Example
+
+From `bot.py:212-216`:
+
+```python
+# Find GitHub repo
+repo_url = None
+if metadata:
+    repo_url = self.github_finder.find_repo(address, metadata)
+```
+
+From `webhook.py:316-350` (getting commit info):
+
+```python
+def get_latest_commit(self, repo_url: str, branch: str = "main") -> Optional[dict]:
+    """Get the latest commit from a repository."""
+    try:
+        parsed = urlparse(repo_url)
+        path_parts = parsed.path.strip("/").split("/")
+
+        if len(path_parts) < 2:
+            return None
+
+        owner, repo = path_parts[0], path_parts[1]
+
+        time.sleep(self.rate_limit_delay)
+
+        response = requests.get(
+            f"{self.github_api_url}/repos/{owner}/{repo}/commits/{branch}",
+            headers=self._github_headers(),
+            timeout=10
+        )
+
+        if response.status_code != 200:
+            return None
+
+        data = response.json()
+
+        return {
+            "sha": data.get("sha"),
+            "message": data.get("commit", {}).get("message", ""),
+            "author": data.get("commit", {}).get("author", {}).get("name", "Unknown"),
+            "date": data.get("commit", {}).get("author", {}).get("date"),
+            "url": data.get("html_url"),
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting latest commit: {e}")
+        return None
+```
+
+## URL Pattern Matching
+
+The finder uses regex patterns to extract GitHub URLs:
+
+```python
+patterns = [
+    r'https?://github\.com/([\w\-]+)/([\w\-\.]+)',
+    r'github\.com/([\w\-]+)/([\w\-\.]+)',
+]
+```
+
+URLs are automatically:
+- Cleaned of `.git` suffixes
+- Stripped of file paths (`/blob/*`, `/tree/*`)
+- Validated against GitHub API
+
+## Rate Limiting
+
+<Info>
+  The finder includes built-in rate limiting with a 200ms delay between requests. Use a GitHub token for higher rate limits (5000 req/hr vs 60 req/hr).
+</Info>
+
+**Rate limit handling:**
+```python
+self.rate_limit_delay = 0.2  # 200ms between requests
+time.sleep(self.rate_limit_delay)  # Applied before each API call
+```
+
+## Features
+
+<CardGroup cols={2}>
+  <Card title="Multi-Strategy Search" icon="search">
+    Uses 4 different strategies to find repositories
+  </Card>
+  <Card title="Validation" icon="check-circle">
+    Verifies all URLs point to valid repositories
+  </Card>
+  <Card title="Solidity Detection" icon="file-code">
+    Confirms repositories contain Solidity code
+  </Card>
+  <Card title="Multi-file Support" icon="files">
+    Handles Basescan's multi-file JSON format
+  </Card>
+</CardGroup>
+
+## Error Handling
+
+The finder gracefully handles:
+- Invalid or malformed URLs
+- GitHub API errors and rate limits
+- Non-existent repositories
+- Missing or empty source code
+- Basescan API failures
+
+All errors are logged with context but don't raise exceptions:
+
+```python
+try:
+    # Search operations
+    pass
+except Exception as e:
+    logger.error(f"Error searching: {e}")
+    return None
+```
+
+<Tip>
+  For best results, provide contract metadata from the scanner. This gives the finder more context for accurate repository discovery.
+</Tip>

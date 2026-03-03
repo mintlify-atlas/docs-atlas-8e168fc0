@@ -1,0 +1,298 @@
+---
+title: SolidityAuditor
+description: AI-powered smart contract security auditor using Claude
+---
+
+## Overview
+
+The `SolidityAuditor` component performs automated security audits of Solidity smart contracts using Anthropic's Claude AI model. It can audit contracts from GitHub repositories or direct source code.
+
+## Initialization
+
+```python
+from auditor import SolidityAuditor
+
+auditor = SolidityAuditor(
+    anthropic_api_key=config.anthropic_api_key,
+    temp_dir=config.temp_dir
+)
+```
+
+### Parameters
+
+<ParamField path="anthropic_api_key" type="str" required>
+  Anthropic API key for Claude access
+</ParamField>
+
+<ParamField path="temp_dir" type="Path" default="/tmp/audit_repos">
+  Directory for cloning repositories during audits
+</ParamField>
+
+## Key Methods
+
+### audit_repo()
+
+Performs a full audit of a GitHub repository.
+
+```python
+report = auditor.audit_repo(repo_url)
+```
+
+**Parameters:**
+- `repo_url` (str): GitHub repository URL
+
+**Returns:** `FullAuditReport` - Complete audit report with findings
+
+### audit_source_code()
+
+Audits source code directly without cloning a repository.
+
+```python
+report = auditor.audit_source_code(source_code, contract_name)
+```
+
+**Parameters:**
+- `source_code` (str): Solidity source code to audit
+- `contract_name` (str): Name of the contract
+
+**Returns:** `FullAuditReport` - Audit report with findings
+
+### clone_repo()
+
+Clones a GitHub repository for auditing.
+
+```python
+repo_path = auditor.clone_repo(repo_url)
+```
+
+**Parameters:**
+- `repo_url` (str): GitHub repository URL
+
+**Returns:** `Path` - Local path to cloned repository
+
+### find_solidity_files()
+
+Finds all Solidity files in a repository.
+
+```python
+sol_files = auditor.find_solidity_files(repo_path)
+```
+
+**Parameters:**
+- `repo_path` (Path): Path to repository
+
+**Returns:** `list[Path]` - List of Solidity file paths (excludes tests and mocks)
+
+## Data Classes
+
+### Finding
+
+Represents a single security finding.
+
+```python
+@dataclass
+class Finding:
+    severity: str              # Critical, High, Medium, Low
+    title: str                 # Brief description
+    description: str           # Detailed explanation
+    location: Optional[str]    # Function or line reference
+    recommendation: Optional[str]  # How to fix
+```
+
+### FullAuditReport
+
+Complete audit report for a repository or contract.
+
+```python
+@dataclass
+class FullAuditReport:
+    repo_url: str
+    audit_date: datetime
+    files_audited: int
+    total_findings: int
+    critical_count: int
+    high_count: int
+    medium_count: int
+    low_count: int
+    findings: list[Finding]
+    summary: str
+    error: Optional[str]
+```
+
+## Vulnerability Detection
+
+The auditor checks for the following vulnerability categories:
+
+<AccordionGroup>
+  <Accordion title="Reentrancy Attacks">
+    - State changes after external calls
+    - Cross-function reentrancy
+  </Accordion>
+  
+  <Accordion title="Access Control Issues">
+    - Missing modifiers
+    - Improper role management
+    - Unprotected functions
+  </Accordion>
+  
+  <Accordion title="Integer Overflow/Underflow">
+    - Unchecked arithmetic operations
+    - Version-specific issues
+  </Accordion>
+  
+  <Accordion title="Unchecked External Calls">
+    - Missing return value checks
+    - call/delegatecall issues
+  </Accordion>
+  
+  <Accordion title="Centralization Risks">
+    - Single owner control
+    - Upgrade mechanisms
+    - Emergency functions
+  </Accordion>
+  
+  <Accordion title="Gas Optimization Issues">
+    - Unbounded loops
+    - Expensive storage operations
+  </Accordion>
+  
+  <Accordion title="Logic Errors">
+    - Incorrect state transitions
+    - Race conditions
+  </Accordion>
+  
+  <Accordion title="Front-running Vulnerabilities">
+    - Price manipulation
+    - Sandwich attacks
+  </Accordion>
+  
+  <Accordion title="Denial of Service">
+    - Block gas limit issues
+    - Failed transfers blocking execution
+  </Accordion>
+  
+  <Accordion title="Oracle Manipulation">
+    - Price oracle issues
+    - Flash loan attacks
+  </Accordion>
+</AccordionGroup>
+
+## Usage Examples
+
+### Auditing from Repository
+
+From `bot.py:241-281`:
+
+```python
+def _audit_contract(self, contract: Contract, repo_url: str):
+    """Audit a contract from its GitHub repository."""
+    logger.info(f"Auditing contract {contract.address} from repo {repo_url}")
+
+    try:
+        # Perform audit
+        report = self.auditor.audit_repo(repo_url)
+
+        if report.error:
+            logger.error(f"Audit failed: {report.error}")
+            return
+
+        # Save audit result
+        audit = Audit(
+            id=None,
+            contract_id=contract.id,
+            audit_date=datetime.utcnow(),
+            critical_count=report.critical_count,
+            high_count=report.high_count,
+            medium_count=report.medium_count,
+            low_count=report.low_count,
+            summary=report.summary,
+            full_report=None
+        )
+
+        audit_id = self.db.add_audit(audit)
+        audit.id = audit_id
+
+        # Update contract
+        self.db.update_contract_audit_time(contract.address)
+
+        # Add to monitored repos
+        self.db.add_monitored_repo(repo_url, contract.id)
+
+        logger.info(f"Audit complete: {report.total_findings} issues found")
+
+        # Post to Twitter
+        self._post_audit_tweet(contract, audit, report)
+
+    except Exception as e:
+        logger.error(f"Error auditing contract: {e}")
+```
+
+### Auditing from Source Code
+
+From `bot.py:283-323`:
+
+```python
+def _audit_from_source(self, contract: Contract, metadata: dict):
+    """Audit a contract from its verified source code."""
+    logger.info(f"Auditing contract {contract.address} from verified source")
+
+    try:
+        source_code = metadata.get("source_code", "")
+        contract_name = metadata.get("contract_name", "Unknown")
+
+        # Perform audit
+        report = self.auditor.audit_source_code(source_code, contract_name)
+
+        if report.error:
+            logger.error(f"Audit failed: {report.error}")
+            return
+
+        # Save audit result and post to Twitter
+        # ...
+
+    except Exception as e:
+        logger.error(f"Error auditing from source: {e}")
+```
+
+## Configuration
+
+<ResponseField name="max_file_size" type="int" default="100000">
+  Maximum file size in bytes (100KB) to audit
+</ResponseField>
+
+<ResponseField name="max_retries" type="int" default="2">
+  Maximum number of API retry attempts
+</ResponseField>
+
+<ResponseField name="model" type="str" default="claude-sonnet-4-20250514">
+  Claude model used for analysis
+</ResponseField>
+
+## Features
+
+<CardGroup cols={2}>
+  <Card title="Deep Clone" icon="git">
+    Uses shallow clones for faster repository access
+  </Card>
+  <Card title="Smart Filtering" icon="filter">
+    Automatically skips test files, mocks, and interfaces
+  </Card>
+  <Card title="Multi-file Support" icon="files">
+    Handles both single files and multi-file contracts from Basescan
+  </Card>
+  <Card title="Rate Limit Handling" icon="clock">
+    Automatic retry with 60-second wait on rate limits
+  </Card>
+</CardGroup>
+
+<Warning>
+  The auditor requires a valid Anthropic API key with sufficient credits. Each audit consumes tokens based on contract complexity.
+</Warning>
+
+## Cleanup
+
+The auditor automatically cleans up cloned repositories after auditing:
+
+```python
+auditor.cleanup(repo_path)  # Called automatically in audit_repo()
+```

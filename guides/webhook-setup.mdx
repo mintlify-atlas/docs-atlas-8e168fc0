@@ -1,0 +1,495 @@
+---
+title: Webhook Setup
+description: Configure GitHub webhooks to monitor repository updates in real-time
+---
+
+## Overview
+
+Base Audit Bot includes a webhook server that receives GitHub push notifications. When monitored repositories are updated, the bot automatically:
+
+- Posts tweets about repository updates
+- Detects Solidity file changes
+- Triggers re-audits for smart contract modifications
+- Updates the database with the latest commit information
+
+## How Webhooks Work
+
+The webhook server runs on port 5000 (configurable) and exposes two endpoints:
+
+- **`/health`**: Health check endpoint
+- **`/webhook/github`**: GitHub webhook receiver (via `webhook.py:40`)
+
+When a push event occurs, GitHub sends a POST request with:
+- Event payload containing commit information
+- HMAC-SHA256 signature for verification
+- Event type header
+
+## Prerequisites
+
+<Steps>
+  <Step title="Bot deployed and running">
+    The webhook server starts automatically when the bot runs.
+    
+    ```bash
+    # Verify webhook server is running
+    curl http://localhost:5000/health
+    ```
+    
+    Expected response:
+    ```json
+    {"status": "healthy", "timestamp": "2026-03-03T12:00:00.000000"}
+    ```
+  </Step>
+  
+  <Step title="Public URL or tunnel">
+    GitHub needs to reach your webhook endpoint. Options:
+    
+    - **Production**: Deploy to a server with a public IP/domain
+    - **Testing**: Use ngrok or similar tunnel service
+    - **Cloud**: Deploy to cloud platform with automatic URLs
+  </Step>
+  
+  <Step title="Webhook secret configured">
+    Set `WEBHOOK_SECRET` in your `.env` file:
+    ```env
+    WEBHOOK_SECRET=your_random_webhook_secret_here
+    ```
+    
+    <Tip>
+      Generate a secure secret:
+      ```bash
+      openssl rand -hex 32
+      ```
+    </Tip>
+  </Step>
+</Steps>
+
+## Setting Up Webhooks
+
+### Step 1: Expose Your Webhook Endpoint
+
+<Tabs>
+  <Tab title="Production (Nginx)">
+    Use a reverse proxy with SSL:
+    
+    ```nginx
+    server {
+        listen 443 ssl;
+        server_name bot.yourdomain.com;
+        
+        ssl_certificate /etc/letsencrypt/live/bot.yourdomain.com/fullchain.pem;
+        ssl_certificate_key /etc/letsencrypt/live/bot.yourdomain.com/privkey.pem;
+        
+        location /webhook/github {
+            proxy_pass http://localhost:5000;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Hub-Signature-256 $http_x_hub_signature_256;
+            proxy_set_header X-GitHub-Event $http_x_github_event;
+        }
+    }
+    ```
+    
+    Your webhook URL: `https://bot.yourdomain.com/webhook/github`
+  </Tab>
+  
+  <Tab title="Testing (ngrok)">
+    Use ngrok for local development:
+    
+    ```bash
+    # Install ngrok
+    # Download from https://ngrok.com/download
+    
+    # Start tunnel
+    ngrok http 5000
+    ```
+    
+    Output:
+    ```
+    Forwarding: https://abc123.ngrok.io -> http://localhost:5000
+    ```
+    
+    Your webhook URL: `https://abc123.ngrok.io/webhook/github`
+    
+    <Warning>
+      ngrok URLs change on restart. Consider using a fixed subdomain with a paid plan for persistent testing.
+    </Warning>
+  </Tab>
+  
+  <Tab title="Cloud (Docker)">
+    If deployed to cloud platforms:
+    
+    - **AWS**: Use ALB + ECS/EC2 public IP
+    - **GCP**: Use Cloud Run or Compute Engine public IP
+    - **DigitalOcean**: Use App Platform or Droplet public IP
+    
+    Ensure port 5000 is accessible or configure load balancer.
+  </Tab>
+</Tabs>
+
+### Step 2: Configure GitHub Webhook
+
+<Steps>
+  <Step title="Navigate to repository settings">
+    Go to your GitHub repository:
+    ```
+    https://github.com/username/repository/settings/hooks
+    ```
+  </Step>
+  
+  <Step title="Add webhook">
+    Click **"Add webhook"**
+    
+    Fill in the configuration:
+    
+    **Payload URL**
+    ```
+    https://bot.yourdomain.com/webhook/github
+    ```
+    
+    **Content type**
+    ```
+    application/json
+    ```
+    
+    **Secret**
+    ```
+    [Same value as WEBHOOK_SECRET in .env]
+    ```
+    
+    <Warning>
+      The secret must **exactly match** `WEBHOOK_SECRET` in your bot's `.env` file. The bot uses HMAC-SHA256 to verify signatures (via `webhook.py:49`).
+    </Warning>
+  </Step>
+  
+  <Step title="Select events">
+    Choose which events to receive:
+    
+    <Accordion title="Recommended: Just the push event">
+      Select **"Just the push event"**
+      
+      This triggers when:
+      - Commits are pushed
+      - Tags are pushed
+      - Branches are updated
+    </Accordion>
+    
+    <Accordion title="Advanced: Let me select individual events">
+      If you want more control, select individual events:
+      - ✅ **Pushes** - Repository updates
+      - ✅ **Pull requests** - (Future support)
+      - ✅ **Releases** - (Future support)
+    </Accordion>
+  </Step>
+  
+  <Step title="Activate webhook">
+    - Ensure **"Active"** is checked
+    - Click **"Add webhook"**
+    
+    GitHub will send a `ping` event to test the connection.
+  </Step>
+</Steps>
+
+### Step 3: Verify Webhook
+
+<Steps>
+  <Step title="Check delivery status">
+    In GitHub webhook settings, click on the webhook you just created.
+    
+    Go to **"Recent Deliveries"** tab.
+    
+    You should see a `ping` event with:
+    - ✅ Green checkmark
+    - HTTP 200 response
+    - Response body: `{"message": "pong"}`
+  </Step>
+  
+  <Step title="Check bot logs">
+    ```bash
+    # Docker
+    docker-compose logs -f | grep webhook
+    
+    # Python
+    tail -f logs/bot.log | grep webhook
+    ```
+    
+    Expected output:
+    ```
+    INFO - Received GitHub webhook: ping
+    INFO - Received ping event
+    ```
+  </Step>
+  
+  <Step title="Test with a real push">
+    Make a commit and push to the repository:
+    
+    ```bash
+    echo "# Test" >> README.md
+    git add README.md
+    git commit -m "Test webhook"
+    git push
+    ```
+    
+    Check bot logs:
+    ```
+    INFO - Received GitHub webhook: push
+    INFO - Push to username/repository: Test webhook
+    ```
+  </Step>
+</Steps>
+
+## Webhook Events
+
+The bot handles two types of events:
+
+### Ping Event
+
+Sent by GitHub to verify webhook configuration (via `webhook.py:92`).
+
+**Bot response**: Returns `{"message": "pong"}` with HTTP 200.
+
+### Push Event
+
+Sent when commits are pushed to the repository (via `webhook.py:88`).
+
+**Bot actions**:
+1. Extracts repository and commit information
+2. Checks if any Solidity files (`.sol`) were modified (via `webhook.py:120`)
+3. Calls `on_push` callback to tweet about the update (via `webhook.py:148`)
+4. If Solidity files changed, calls `on_solidity_change` to trigger re-audit (via `webhook.py:155`)
+5. Updates database with latest commit SHA (via `webhook.py:228`)
+
+**Event data structure**:
+```python
+{
+    "repo_name": "username/repository",
+    "repo_url": "https://github.com/username/repository",
+    "ref": "refs/heads/main",
+    "commit_sha": "abc123d",
+    "commit_message": "Fix reentrancy vulnerability",
+    "commit_url": "https://github.com/username/repository/commit/abc123d",
+    "author": "John Doe",
+    "solidity_changed": true,
+    "modified_files": ["contracts/Token.sol", "README.md"]
+}
+```
+
+## Security
+
+### Signature Verification
+
+The bot verifies all webhook requests using HMAC-SHA256 (via `webhook.py:49`):
+
+```python
+def _verify_signature(self, payload: bytes, signature: str) -> bool:
+    """Verify GitHub webhook signature."""
+    if not signature.startswith("sha256="):
+        return False
+    
+    expected_signature = "sha256=" + hmac.new(
+        self.webhook_secret.encode(),
+        payload,
+        hashlib.sha256
+    ).hexdigest()
+    
+    return hmac.compare_digest(signature, expected_signature)
+```
+
+<Warning>
+  **Requests with invalid signatures are rejected with HTTP 401** (via `webhook.py:72`).
+  
+  This prevents:
+  - Unauthorized webhook triggers
+  - Malicious payload injection
+  - Replay attacks
+</Warning>
+
+### Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use strong webhook secrets">
+    Generate cryptographically secure secrets:
+    ```bash
+    # Linux/Mac
+    openssl rand -hex 32
+    
+    # Python
+    python -c "import secrets; print(secrets.token_hex(32))"
+    ```
+    
+    Minimum recommended length: 32 characters
+  </Accordion>
+  
+  <Accordion title="Enable HTTPS">
+    Always use HTTPS for webhook endpoints in production:
+    - Prevents man-in-the-middle attacks
+    - Protects webhook secret in transit
+    - Required by many GitHub organization policies
+    
+    <Tip>
+      Get free SSL certificates from [Let's Encrypt](https://letsencrypt.org/)
+    </Tip>
+  </Accordion>
+  
+  <Accordion title="Restrict to GitHub IPs">
+    Optionally restrict webhook endpoint to GitHub's IP ranges:
+    
+    ```nginx
+    # Nginx example
+    location /webhook/github {
+        allow 192.30.252.0/22;
+        allow 185.199.108.0/22;
+        allow 140.82.112.0/20;
+        allow 143.55.64.0/20;
+        deny all;
+        
+        proxy_pass http://localhost:5000;
+    }
+    ```
+    
+    <Note>
+      GitHub's IP ranges: [https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/about-githubs-ip-addresses](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/about-githubs-ip-addresses)
+    </Note>
+  </Accordion>
+  
+  <Accordion title="Monitor webhook logs">
+    Set up alerts for:
+    - Repeated signature verification failures
+    - Unusual event frequencies
+    - Webhook errors
+    
+    ```bash
+    # Check for signature failures
+    grep "Invalid webhook signature" logs/bot.log
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="GitHub shows delivery failure">
+    **Symptoms**: Red X in Recent Deliveries
+    
+    **Common causes**:
+    1. **Endpoint not accessible**
+       - Check firewall rules
+       - Verify bot is running
+       - Test with: `curl http://your-url/webhook/github`
+    
+    2. **SSL/TLS issues**
+       - Verify certificate is valid
+       - Check for self-signed certificate errors
+    
+    3. **Timeout**
+       - Bot taking too long to respond
+       - Check bot logs for errors
+       - Increase GitHub timeout if needed
+  </Accordion>
+  
+  <Accordion title="Signature verification failing">
+    **Symptoms**: Logs show "Invalid webhook signature"
+    
+    **Causes**:
+    1. **Secret mismatch**
+       - Verify `WEBHOOK_SECRET` matches GitHub configuration
+       - Check for extra whitespace or newlines
+    
+    2. **Proxy modifying payload**
+       - Ensure reverse proxy doesn't alter request body
+       - Check `X-Hub-Signature-256` header is forwarded
+    
+    **Debug**:
+    ```bash
+    # Check secret in container
+    docker-compose exec audit-bot env | grep WEBHOOK_SECRET
+    
+    # Test signature locally
+    echo -n '{"test":true}' | openssl dgst -sha256 -hmac "your_secret"
+    ```
+  </Accordion>
+  
+  <Accordion title="Events not triggering actions">
+    **Symptoms**: Webhook received but no tweets/audits
+    
+    **Check**:
+    1. **Bot logs for errors**
+       ```bash
+       docker-compose logs -f | grep -i error
+       ```
+    
+    2. **Event type**
+       - Only `push` events trigger actions
+       - Verify event type in GitHub delivery details
+    
+    3. **Callbacks registered**
+       - Check `on_push` and `on_solidity_change` are configured
+       - See `webhook.py:206` for callback setup
+  </Accordion>
+  
+  <Accordion title="Health check passing but webhooks failing">
+    **Possible causes**:
+    1. **Reverse proxy configuration**
+       - Ensure `/webhook/github` path is proxied correctly
+       - Check headers are forwarded
+    
+    2. **Request method**
+       - Webhooks require POST method
+       - Health check uses GET method
+    
+    **Test**:
+    ```bash
+    # Test POST to webhook endpoint
+    curl -X POST https://your-url/webhook/github \
+      -H "Content-Type: application/json" \
+      -H "X-GitHub-Event: ping" \
+      -H "X-Hub-Signature-256: sha256=test" \
+      -d '{"zen":"test"}'
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Advanced Configuration
+
+### Multiple Repositories
+
+Set up webhooks for multiple repositories using the same bot instance:
+
+1. Configure webhook in each repository (same settings)
+2. All repositories send to same URL
+3. Bot handles all events through single endpoint
+
+### Custom Event Handling
+
+Modify webhook behavior by editing callback functions in `webhook.py:206`:
+
+```python
+def on_push(event_data: dict):
+    """Custom push event handler."""
+    # Add your custom logic here
+    pass
+
+def on_solidity_change(event_data: dict):
+    """Custom Solidity change handler."""
+    # Add your custom logic here
+    pass
+```
+
+### Webhook Testing
+
+Use GitHub's webhook testing features:
+
+1. Go to webhook settings
+2. Click **"Recent Deliveries"**
+3. Click on any delivery
+4. Click **"Redeliver"** to resend the event
+
+<Tip>
+  This is useful for debugging without making actual commits.
+</Tip>
+
+## Next Steps
+
+- [Configuration Guide](/guides/configuration) - Configure webhook settings
+- [Troubleshooting](/guides/troubleshooting) - Common webhook issues
+- [Deployment Guide](/guides/deployment) - Production webhook setup

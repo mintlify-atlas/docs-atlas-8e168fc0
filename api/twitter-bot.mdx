@@ -1,0 +1,341 @@
+---
+title: "TwitterBot"
+description: "Twitter bot for posting audit results, daily summaries, and handling direct message commands."
+---
+
+## Overview
+
+The `TwitterBot` class manages all Twitter interactions including posting audit results, repository updates, daily summaries, and processing direct message commands.
+
+## Class Definition
+
+```python
+from twitter_bot import TwitterBot, TwitterCredentials
+```
+
+## Initialization
+
+The bot requires Twitter API v2 credentials wrapped in a `TwitterCredentials` object.
+
+### TwitterCredentials
+
+<ParamField path="api_key" type="str" required>
+  Twitter API key (Consumer Key)
+</ParamField>
+
+<ParamField path="api_secret" type="str" required>
+  Twitter API secret (Consumer Secret)
+</ParamField>
+
+<ParamField path="access_token" type="str" required>
+  OAuth access token
+</ParamField>
+
+<ParamField path="access_secret" type="str" required>
+  OAuth access token secret
+</ParamField>
+
+<ParamField path="bearer_token" type="str" required>
+  Twitter API v2 bearer token
+</ParamField>
+
+```python
+from twitter_bot import TwitterBot, TwitterCredentials
+
+creds = TwitterCredentials(
+    api_key="your_api_key",
+    api_secret="your_api_secret",
+    access_token="your_access_token",
+    access_secret="your_access_secret",
+    bearer_token="your_bearer_token"
+)
+
+bot = TwitterBot(creds)
+```
+
+## Methods
+
+### post_audit(contract, audit, findings_summary)
+
+Post an audit result as a tweet.
+
+<ParamField path="contract" type="Contract" required>
+  Contract database record containing address, name, and repository URL
+</ParamField>
+
+<ParamField path="audit" type="Audit" required>
+  Audit database record containing findings counts and summary
+</ParamField>
+
+<ParamField path="findings_summary" type="str" optional>
+  Optional summary of findings (not currently used in tweet)
+</ParamField>
+
+```python
+tweet = bot.post_audit(contract, audit)
+```
+
+<ResponseField name="return" type="Tweet | None">
+  Tweet record if posted successfully, None if failed. Contains:
+  - `id` - Database ID (initially None)
+  - `audit_id` - Associated audit ID
+  - `tweet_id` - Twitter tweet ID
+  - `posted_at` - When the tweet was posted
+  - `tweet_type` - "audit"
+  - `content` - Tweet text content
+</ResponseField>
+
+**Tweet Format:**
+```
+🔍 New audit: {contract_name}
+
+📊 Findings: {total} issue(s) found
+⚠️ Critical: {n} | High: {n} | Medium: {n}
+
+🔗 Contract: {basescan_link}
+📁 Repo: {github_repo}
+
+#BaseChain #SmartContractSecurity
+```
+
+### post_thread(messages)
+
+Post a thread of tweets.
+
+<ParamField path="messages" type="list[str]" required>
+  List of tweet messages. Each becomes a tweet in the thread.
+</ParamField>
+
+```python
+tweet_ids = bot.post_thread([
+    "First tweet in thread",
+    "Second tweet replying to first",
+    "Third tweet replying to second"
+])
+```
+
+<ResponseField name="return" type="list[str]">
+  List of tweet IDs posted. Empty list if all failed.
+</ResponseField>
+
+### post_detailed_findings(contract, audit, findings)
+
+Post detailed findings as a Twitter thread.
+
+<ParamField path="contract" type="Contract" required>
+  Contract database record
+</ParamField>
+
+<ParamField path="audit" type="Audit" required>
+  Audit database record
+</ParamField>
+
+<ParamField path="findings" type="list[Finding]" required>
+  List of Finding objects from the audit
+</ParamField>
+
+```python
+tweet_ids = bot.post_detailed_findings(contract, audit, findings)
+```
+
+<ResponseField name="return" type="list[str]">
+  List of tweet IDs in the thread
+</ResponseField>
+
+**Behavior:**
+- First tweet is a summary
+- Subsequent tweets detail Critical and High findings only
+- Maximum 5 findings posted to avoid spam
+- Each finding includes severity emoji, title, description, and fix recommendation
+
+### post_repo_update(repo_name, commit_message, commit_url)
+
+Post a repository update notification.
+
+<ParamField path="repo_name" type="str" required>
+  Name of the repository (e.g., "owner/repo")
+</ParamField>
+
+<ParamField path="commit_message" type="str" required>
+  Git commit message
+</ParamField>
+
+<ParamField path="commit_url" type="str" required>
+  URL to the commit on GitHub
+</ParamField>
+
+```python
+tweet = bot.post_repo_update(
+    "owner/repo",
+    "Fix critical security issue",
+    "https://github.com/owner/repo/commit/abc123"
+)
+```
+
+<ResponseField name="return" type="Tweet | None">
+  Tweet record if posted successfully, None if failed
+</ResponseField>
+
+**Tweet Format:**
+```
+🔄 Update detected: {repo_name}
+
+📝 {commit_message}
+
+🔗 {commit_url}
+
+#BaseChain #Development
+```
+
+### post_daily_summary(stats)
+
+Post daily audit summary statistics.
+
+<ParamField path="stats" type="dict" required>
+  Dictionary containing daily statistics:
+  - `contracts_scanned` - Number of contracts scanned
+  - `total_audits` - Number of audits completed
+  - `total_critical` - Total critical issues found
+  - `total_high` - Total high severity issues
+  - `total_medium` - Total medium severity issues
+  - `total_low` - Total low severity issues
+</ParamField>
+
+```python
+stats = {
+    "contracts_scanned": 15,
+    "total_audits": 12,
+    "total_critical": 2,
+    "total_high": 5,
+    "total_medium": 8,
+    "total_low": 3
+}
+
+tweet = bot.post_daily_summary(stats)
+```
+
+<ResponseField name="return" type="Tweet | None">
+  Tweet record if posted successfully, None if failed
+</ResponseField>
+
+**Tweet Format:**
+```
+📊 Daily Audit Summary
+
+🔍 Contracts scanned: {n}
+✅ Audits completed: {n}
+⚠️ Issues found: {n}
+   - Critical: {n}
+   - High: {n}
+   - Medium: {n}
+
+#BaseChain #SmartContractSecurity
+```
+
+### check_dm_commands()
+
+Check direct messages for audit commands.
+
+```python
+commands = bot.check_dm_commands()
+```
+
+<ResponseField name="return" type="list[dict]">
+  List of command dictionaries. Each contains:
+  - `type` - Command type (currently only "audit")
+  - `address` - Contract address from command
+  - `sender_id` - Twitter user ID who sent the command
+  - `dm_id` - Direct message ID
+</ResponseField>
+
+**Supported Commands:**
+- `audit 0x...` - Request audit for a contract address
+
+**Example:**
+```python
+for cmd in commands:
+    if cmd["type"] == "audit":
+        address = cmd["address"]
+        # Process audit request...
+        bot.send_dm(cmd["sender_id"], f"Auditing {address}...")
+```
+
+### send_dm(user_id, message)
+
+Send a direct message to a user.
+
+<ParamField path="user_id" type="str" required>
+  Twitter user ID to send message to
+</ParamField>
+
+<ParamField path="message" type="str" required>
+  Message text to send
+</ParamField>
+
+```python
+success = bot.send_dm("123456789", "Your audit is complete!")
+```
+
+<ResponseField name="return" type="bool">
+  True if message sent successfully, False otherwise
+</ResponseField>
+
+## Example Usage
+
+```python
+from twitter_bot import TwitterBot, TwitterCredentials
+from models import Contract, Audit
+
+# Initialize bot
+creds = TwitterCredentials(
+    api_key="key",
+    api_secret="secret",
+    access_token="token",
+    access_secret="secret",
+    bearer_token="bearer"
+)
+bot = TwitterBot(creds)
+
+# Post an audit result
+contract = Contract(
+    id=1,
+    address="0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+    contract_name="MyToken",
+    repo_url="https://github.com/owner/repo",
+    # ... other fields
+)
+
+audit = Audit(
+    id=1,
+    contract_id=1,
+    critical_count=2,
+    high_count=3,
+    medium_count=5,
+    low_count=1,
+    summary="Found critical issues",
+    # ... other fields
+)
+
+tweet = bot.post_audit(contract, audit)
+if tweet:
+    print(f"Posted tweet: {tweet.tweet_id}")
+
+# Check for DM commands
+commands = bot.check_dm_commands()
+for cmd in commands:
+    print(f"Received command: {cmd['type']} {cmd['address']}")
+```
+
+## Character Limits
+
+- Maximum tweet length: 280 characters
+- Long tweets are automatically truncated
+- Hashtags are preserved when truncating
+- Commit messages truncated to 100 characters in updates
+
+## Error Handling
+
+- All Twitter API errors are caught and logged
+- Failed posts return `None` instead of raising exceptions
+- Rate limiting is handled automatically by tweepy
+- Authentication is verified during initialization

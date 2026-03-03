@@ -1,0 +1,826 @@
+---
+title: Troubleshooting
+description: Common issues and solutions for Base Audit Bot
+---
+
+## Overview
+
+This guide covers common issues you might encounter when running Base Audit Bot and their solutions.
+
+## Connection Issues
+
+### Bot Not Connecting to Base RPC
+
+<AccordionGroup>
+  <Accordion title="Symptoms">
+    - Bot fails to start with RPC connection errors
+    - Logs show "Connection refused" or "Timeout" errors
+    - Cannot fetch block information
+  </Accordion>
+  
+  <Accordion title="Solutions">
+    <Steps>
+      <Step title="Verify RPC URL">
+        Check `BASE_RPC_URL` in `.env`:
+        ```env
+        BASE_RPC_URL=https://mainnet.base.org
+        ```
+        
+        <Note>
+          The bot validates that the URL starts with `http` or `https` (via `config.py:94`).
+        </Note>
+      </Step>
+      
+      <Step title="Test network connectivity">
+        ```bash
+        # Test RPC endpoint
+        curl -X POST https://mainnet.base.org \
+          -H "Content-Type: application/json" \
+          -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+        ```
+        
+        Expected response with block number.
+      </Step>
+      
+      <Step title="Try alternative RPC endpoints">
+        Alternative Base mainnet RPC URLs:
+        ```env
+        # Public endpoints
+        BASE_RPC_URL=https://mainnet.base.org
+        BASE_RPC_URL=https://base.llamarpc.com
+        BASE_RPC_URL=https://base.blockpi.network/v1/rpc/public
+        ```
+        
+        <Tip>
+          For production, consider using a dedicated RPC provider like Alchemy, Infura, or QuickNode.
+        </Tip>
+      </Step>
+      
+      <Step title="Check firewall rules">
+        Ensure outbound HTTPS (port 443) is allowed:
+        ```bash
+        # Test outbound connection
+        telnet mainnet.base.org 443
+        ```
+      </Step>
+    </Steps>
+  </Accordion>
+</AccordionGroup>
+
+## API Issues
+
+### Twitter Posting Fails
+
+<AccordionGroup>
+  <Accordion title="Symptoms">
+    - Logs show "Twitter posting failed"
+    - Authentication errors
+    - Rate limit errors
+  </Accordion>
+  
+  <Accordion title="Solutions">
+    <Steps>
+      <Step title="Verify all credentials are set">
+        The bot requires **all 5** Twitter credentials (from `README.md:104`):
+        ```env
+        TWITTER_API_KEY=your_twitter_api_key
+        TWITTER_API_SECRET=your_twitter_api_secret
+        TWITTER_ACCESS_TOKEN=your_twitter_access_token
+        TWITTER_ACCESS_SECRET=your_twitter_access_secret
+        TWITTER_BEARER_TOKEN=your_twitter_bearer_token
+        ```
+        
+        <Warning>
+          Missing any credential will prevent the bot from starting (via `config.py:48`).
+        </Warning>
+      </Step>
+      
+      <Step title="Check app permissions">
+        Your Twitter app needs **read and write** permissions:
+        
+        1. Go to [https://developer.twitter.com/](https://developer.twitter.com/)
+        2. Select your app
+        3. Navigate to **Settings** > **User authentication settings**
+        4. Ensure OAuth 1.0a is enabled
+        5. Verify **Read and write** permissions are selected
+        
+        <Note>
+          If you changed permissions, you must regenerate access tokens.
+        </Note>
+      </Step>
+      
+      <Step title="Check rate limits">
+        Twitter API has rate limits (from `README.md:268`):
+        
+        - **Tweet posting**: 300 tweets per 3 hours
+        - **DM reading**: 15 requests per 15 minutes
+        
+        The bot respects these limits automatically, but check for excessive usage.
+      </Step>
+      
+      <Step title="Test credentials">
+        Test Twitter authentication:
+        ```python
+        import tweepy
+        from config import get_config
+        
+        config = get_config()
+        auth = tweepy.OAuthHandler(config.twitter_api_key, config.twitter_api_secret)
+        auth.set_access_token(config.twitter_access_token, config.twitter_access_secret)
+        api = tweepy.API(auth)
+        
+        # Verify credentials
+        print(api.verify_credentials().screen_name)
+        ```
+      </Step>
+    </Steps>
+  </Accordion>
+</AccordionGroup>
+
+### Basescan API Errors
+
+<AccordionGroup>
+  <Accordion title="Symptoms">
+    - Cannot fetch verified contract source code
+    - "Invalid API key" errors
+    - Rate limit exceeded
+  </Accordion>
+  
+  <Accordion title="Solutions">
+    <Steps>
+      <Step title="Verify API key">
+        ```env
+        BASESCAN_API_KEY=your_basescan_api_key
+        ```
+        
+        <Tip>
+          Get a free API key at [https://basescan.org/apis](https://basescan.org/apis)
+        </Tip>
+      </Step>
+      
+      <Step title="Check API rate limits">
+        Free tier limits:
+        - 5 requests per second
+        - 100,000 requests per day
+        
+        The bot handles rate limiting, but check your usage:
+        ```bash
+        # Check API key status
+        curl "https://api.basescan.org/api?module=account&action=balance&address=0x0000000000000000000000000000000000000000&apikey=YOUR_API_KEY"
+        ```
+      </Step>
+      
+      <Step title="Increase delays between requests">
+        If hitting rate limits, adjust scan settings:
+        ```env
+        SCAN_INTERVAL_MINUTES=30  # Increase from 15
+        BLOCKS_TO_SCAN=50         # Decrease from 100
+        ```
+      </Step>
+    </Steps>
+  </Accordion>
+</AccordionGroup>
+
+### Anthropic API Errors
+
+<AccordionGroup>
+  <Accordion title="Symptoms">
+    - Audits not running
+    - "Invalid API key" errors
+    - Rate limit or quota exceeded
+  </Accordion>
+  
+  <Accordion title="Solutions">
+    <Steps>
+      <Step title="Verify API key">
+        ```env
+        ANTHROPIC_API_KEY=sk-ant-api03-...
+        ```
+        
+        <Tip>
+          Get an API key at [https://console.anthropic.com/](https://console.anthropic.com/)
+        </Tip>
+      </Step>
+      
+      <Step title="Check account credits">
+        Log into Anthropic console and verify:
+        - API key is active
+        - Account has credits
+        - No rate limit restrictions
+      </Step>
+      
+      <Step title="Monitor usage">
+        Check Claude API usage in Anthropic console.
+        
+        Large contracts consume more tokens. Consider:
+        - Increasing `MIN_CONTRACT_SIZE` to filter small contracts
+        - Reducing audit frequency
+      </Step>
+    </Steps>
+  </Accordion>
+</AccordionGroup>
+
+## Audit Issues
+
+### Audits Not Running
+
+<AccordionGroup>
+  <Accordion title="Symptoms">
+    - Contracts detected but not audited
+    - "Skipping audit" messages in logs
+    - No audit results
+  </Accordion>
+  
+  <Accordion title="Solutions">
+    <Steps>
+      <Step title="Check contract has verified source">
+        Only contracts with verified source code on Basescan can be audited (from `README.md:269`).
+        
+        Verify on Basescan:
+        ```
+        https://basescan.org/address/0x...
+        ```
+        
+        Look for green checkmark indicating verified contract.
+      </Step>
+      
+      <Step title="Check contract size">
+        Contracts smaller than `MIN_CONTRACT_SIZE` are skipped:
+        ```env
+        MIN_CONTRACT_SIZE=100  # bytes
+        ```
+        
+        <Note>
+          This filters out very small contracts that are unlikely to be interesting.
+        </Note>
+      </Step>
+      
+      <Step title="Check for blocklist">
+        Contract might be in blocklist table:
+        ```bash
+        sqlite3 data/bot.db "SELECT * FROM blocklist"
+        ```
+        
+        Remove if needed:
+        ```bash
+        sqlite3 data/bot.db "DELETE FROM blocklist WHERE address='0x...'"
+        ```
+      </Step>
+      
+      <Step title="Check logs for errors">
+        ```bash
+        # Docker
+        docker-compose logs | grep -i audit
+        
+        # Python
+        tail -f logs/bot.log | grep -i audit
+        ```
+        
+        Look for specific error messages (from `README.md:293`).
+      </Step>
+    </Steps>
+  </Accordion>
+</AccordionGroup>
+
+### GitHub Repository Not Found
+
+<AccordionGroup>
+  <Accordion title="Symptoms">
+    - Cannot find GitHub repository for contract
+    - "No repository found" messages
+  </Accordion>
+  
+  <Accordion title="Solutions">
+    Contract source on Basescan might not include GitHub links.
+    
+    The bot searches for:
+    - GitHub URLs in contract comments
+    - Repository links in verified source metadata
+    - Organization/repository patterns
+    
+    <Note>
+      Not all verified contracts have associated GitHub repositories. This is expected behavior.
+    </Note>
+  </Accordion>
+</AccordionGroup>
+
+## Webhook Issues
+
+### Webhook Not Receiving Events
+
+<AccordionGroup>
+  <Accordion title="Symptoms">
+    - No webhook events in logs
+    - GitHub shows delivery failures
+    - No tweets about repository updates
+  </Accordion>
+  
+  <Accordion title="Solutions">
+    <Steps>
+      <Step title="Verify webhook URL is accessible">
+        Test from external location:
+        ```bash
+        curl https://your-domain.com/webhook/github
+        ```
+        
+        Should return 405 (Method Not Allowed) for GET requests.
+      </Step>
+      
+      <Step title="Check webhook secret matches">
+        Verify `WEBHOOK_SECRET` in `.env` matches GitHub webhook configuration (from `README.md:298`).
+        
+        <Warning>
+          Signature verification failures are logged as "Invalid webhook signature" (via `webhook.py:72`).
+        </Warning>
+      </Step>
+      
+      <Step title="Verify GitHub webhook configuration">
+        In GitHub repository settings:
+        1. Go to Settings > Webhooks
+        2. Click on your webhook
+        3. Check Recent Deliveries
+        4. Look for errors or failed deliveries
+        
+        Common issues:
+        - SSL certificate errors
+        - Connection timeouts
+        - HTTP errors (4xx, 5xx)
+      </Step>
+      
+      <Step title="Check firewall and port">
+        Ensure port 5000 is accessible:
+        ```bash
+        # Check if port is open
+        netstat -tuln | grep 5000
+        
+        # Check firewall
+        sudo ufw status | grep 5000
+        ```
+      </Step>
+      
+      <Step title="Test with ngrok (development)">
+        For local testing:
+        ```bash
+        ngrok http 5000
+        ```
+        
+        Use the ngrok URL in GitHub webhook configuration.
+      </Step>
+    </Steps>
+  </Accordion>
+</AccordionGroup>
+
+### Signature Verification Failing
+
+<AccordionGroup>
+  <Accordion title="Symptoms">
+    - Logs show "Invalid webhook signature"
+    - GitHub deliveries succeed but bot rejects them
+  </Accordion>
+  
+  <Accordion title="Solutions">
+    <Steps>
+      <Step title="Verify secret matches exactly">
+        Check for:
+        - Extra whitespace
+        - Trailing newlines
+        - Copy/paste errors
+        
+        ```bash
+        # Check secret in environment
+        docker-compose exec audit-bot env | grep WEBHOOK_SECRET
+        ```
+      </Step>
+      
+      <Step title="Check reverse proxy configuration">
+        If using nginx/Apache, ensure headers are forwarded:
+        ```nginx
+        proxy_set_header X-Hub-Signature-256 $http_x_hub_signature_256;
+        ```
+      </Step>
+      
+      <Step title="Test signature manually">
+        ```python
+        import hmac
+        import hashlib
+        
+        secret = "your_webhook_secret"
+        payload = b'{"test":true}'
+        
+        signature = "sha256=" + hmac.new(
+            secret.encode(),
+            payload,
+            hashlib.sha256
+        ).hexdigest()
+        
+        print(signature)
+        ```
+      </Step>
+    </Steps>
+  </Accordion>
+</AccordionGroup>
+
+## Docker Issues
+
+### Container Exits Immediately
+
+<AccordionGroup>
+  <Accordion title="Symptoms">
+    - Container starts then exits
+    - `docker-compose ps` shows "Exit 1"
+  </Accordion>
+  
+  <Accordion title="Solutions">
+    <Steps>
+      <Step title="Check logs for errors">
+        ```bash
+        docker-compose logs
+        ```
+        
+        Common errors:
+        - Missing environment variables (from `config.py:58`)
+        - Invalid configuration values (from `config.py:92`)
+        - Permission denied errors
+      </Step>
+      
+      <Step title="Verify .env file exists">
+        ```bash
+        ls -la .env
+        ```
+        
+        If missing:
+        ```bash
+        cp .env.example .env
+        nano .env
+        ```
+      </Step>
+      
+      <Step title="Check environment variables loaded">
+        ```bash
+        docker-compose config
+        ```
+        
+        Verify all required variables are set.
+      </Step>
+    </Steps>
+  </Accordion>
+</AccordionGroup>
+
+### Health Check Failing
+
+<AccordionGroup>
+  <Accordion title="Symptoms">
+    - Container status shows "unhealthy"
+    - Health check endpoint not responding
+  </Accordion>
+  
+  <Accordion title="Solutions">
+    <Steps>
+      <Step title="Check webhook server is running">
+        ```bash
+        docker-compose exec audit-bot ps aux | grep python
+        ```
+      </Step>
+      
+      <Step title="Test health endpoint internally">
+        ```bash
+        docker-compose exec audit-bot curl http://localhost:5000/health
+        ```
+        
+        Should return:
+        ```json
+        {"status": "healthy", "timestamp": "..."}
+        ```
+      </Step>
+      
+      <Step title="Check logs for startup errors">
+        ```bash
+        docker-compose logs --tail=50
+        ```
+      </Step>
+      
+      <Step title="Verify port binding">
+        ```bash
+        docker-compose exec audit-bot netstat -tuln | grep 5000
+        ```
+      </Step>
+    </Steps>
+  </Accordion>
+</AccordionGroup>
+
+### Volume Permission Issues
+
+<AccordionGroup>
+  <Accordion title="Symptoms">
+    - "Permission denied" errors
+    - Cannot write to database
+    - Log file errors
+  </Accordion>
+  
+  <Accordion title="Solutions">
+    <Steps>
+      <Step title="Create directories with proper permissions">
+        ```bash
+        mkdir -p data logs
+        chmod 755 data logs
+        ```
+      </Step>
+      
+      <Step title="Check ownership">
+        ```bash
+        ls -la data logs
+        ```
+        
+        If needed, adjust ownership:
+        ```bash
+        sudo chown -R $USER:$USER data logs
+        ```
+      </Step>
+      
+      <Step title="Run container as specific user">
+        Add to `docker-compose.yml`:
+        ```yaml
+        services:
+          audit-bot:
+            user: "1000:1000"  # Your user:group ID
+        ```
+      </Step>
+    </Steps>
+  </Accordion>
+</AccordionGroup>
+
+## Database Issues
+
+### Database Locked
+
+<AccordionGroup>
+  <Accordion title="Symptoms">
+    - "Database is locked" errors
+    - Write operations failing
+  </Accordion>
+  
+  <Accordion title="Solutions">
+    <Steps>
+      <Step title="Check for multiple bot instances">
+        ```bash
+        ps aux | grep bot.py
+        docker ps | grep audit-bot
+        ```
+        
+        Stop duplicate instances.
+      </Step>
+      
+      <Step title="Check for stale locks">
+        ```bash
+        # Check for SQLite lock files
+        ls -la data/bot.db*
+        ```
+        
+        Remove if bot is not running:
+        ```bash
+        rm data/bot.db-shm data/bot.db-wal
+        ```
+      </Step>
+      
+      <Step title="Restart the bot">
+        ```bash
+        docker-compose restart
+        ```
+      </Step>
+    </Steps>
+  </Accordion>
+</AccordionGroup>
+
+### Database Corruption
+
+<AccordionGroup>
+  <Accordion title="Symptoms">
+    - "Database disk image is malformed" errors
+    - Query failures
+  </Accordion>
+  
+  <Accordion title="Solutions">
+    <Steps>
+      <Step title="Check database integrity">
+        ```bash
+        sqlite3 data/bot.db "PRAGMA integrity_check;"
+        ```
+      </Step>
+      
+      <Step title="Restore from backup">
+        ```bash
+        cp data/bot.db data/bot.db.corrupted
+        cp data/bot.db.backup data/bot.db
+        ```
+      </Step>
+      
+      <Step title="Rebuild database">
+        If no backup:
+        ```bash
+        mv data/bot.db data/bot.db.old
+        # Bot will create new database on startup
+        docker-compose restart
+        ```
+      </Step>
+    </Steps>
+  </Accordion>
+</AccordionGroup>
+
+## Configuration Issues
+
+### Missing Required Environment Variables
+
+<AccordionGroup>
+  <Accordion title="Symptoms">
+    - Bot fails to start
+    - "Missing required environment variables" error
+  </Accordion>
+  
+  <Accordion title="Solutions">
+    The bot requires these variables (from `config.py:48`):
+    ```env
+    BASE_RPC_URL
+    BASESCAN_API_KEY
+    ANTHROPIC_API_KEY
+    TWITTER_API_KEY
+    TWITTER_API_SECRET
+    TWITTER_ACCESS_TOKEN
+    TWITTER_ACCESS_SECRET
+    ```
+    
+    <Steps>
+      <Step title="Check .env file">
+        ```bash
+        cat .env | grep -E "(BASE_RPC_URL|BASESCAN_API_KEY|ANTHROPIC_API_KEY|TWITTER)"
+        ```
+      </Step>
+      
+      <Step title="Verify values are set">
+        Look for empty values:
+        ```bash
+        grep "=your_" .env
+        ```
+        
+        Replace all placeholder values with actual API keys.
+      </Step>
+    </Steps>
+  </Accordion>
+</AccordionGroup>
+
+### Invalid Configuration Values
+
+<AccordionGroup>
+  <Accordion title="Symptoms">
+    - Bot exits with validation errors
+    - "ValueError" in logs
+  </Accordion>
+  
+  <Accordion title="Solutions">
+    The bot validates configuration on startup (via `config.py:92`):
+    
+    <Steps>
+      <Step title="Check BASE_RPC_URL format">
+        Must start with `http` or `https`:
+        ```env
+        BASE_RPC_URL=https://mainnet.base.org  # ✓ Valid
+        BASE_RPC_URL=mainnet.base.org          # ✗ Invalid
+        ```
+      </Step>
+      
+      <Step title="Check numeric values">
+        Must be positive integers:
+        ```env
+        SCAN_INTERVAL_MINUTES=15  # Must be >= 1
+        BLOCKS_TO_SCAN=100        # Must be >= 1
+        ```
+      </Step>
+      
+      <Step title="Check port number">
+        ```env
+        WEBHOOK_PORT=5000  # Valid port number
+        ```
+      </Step>
+    </Steps>
+  </Accordion>
+</AccordionGroup>
+
+## Performance Issues
+
+### High Memory Usage
+
+<AccordionGroup>
+  <Accordion title="Symptoms">
+    - Container using excessive RAM
+    - System slowdown
+  </Accordion>
+  
+  <Accordion title="Solutions">
+    <Steps>
+      <Step title="Monitor memory usage">
+        ```bash
+        docker stats base-audit-bot
+        ```
+      </Step>
+      
+      <Step title="Clear temp repos">
+        ```bash
+        docker-compose exec audit-bot rm -rf /app/temp_repos/*
+        ```
+      </Step>
+      
+      <Step title="Set memory limits">
+        Add to `docker-compose.yml`:
+        ```yaml
+        services:
+          audit-bot:
+            deploy:
+              resources:
+                limits:
+                  memory: 1G
+        ```
+      </Step>
+    </Steps>
+  </Accordion>
+</AccordionGroup>
+
+### High Disk Usage
+
+<AccordionGroup>
+  <Accordion title="Symptoms">
+    - Disk space filling up
+    - Large database or log files
+  </Accordion>
+  
+  <Accordion title="Solutions">
+    <Steps>
+      <Step title="Check disk usage">
+        ```bash
+        du -sh data logs
+        docker system df
+        ```
+      </Step>
+      
+      <Step title="Clean old logs">
+        Log rotation is automatic (10MB, 3 files) via `docker-compose.yml:44`, but you can manually clean:
+        ```bash
+        docker-compose down
+        rm logs/*
+        docker-compose up -d
+        ```
+      </Step>
+      
+      <Step title="Vacuum database">
+        ```bash
+        sqlite3 data/bot.db "VACUUM;"
+        ```
+      </Step>
+      
+      <Step title="Clean Docker system">
+        ```bash
+        docker system prune -a
+        ```
+      </Step>
+    </Steps>
+  </Accordion>
+</AccordionGroup>
+
+## Getting Help
+
+<CardGroup cols={2}>
+  <Card title="Check Logs" icon="file-lines">
+    Always check logs first:
+    ```bash
+    docker-compose logs -f
+    ```
+  </Card>
+  
+  <Card title="Enable Debug Logging" icon="bug">
+    Set in `.env`:
+    ```env
+    LOG_LEVEL=DEBUG
+    ```
+  </Card>
+  
+  <Card title="Test Configuration" icon="wrench">
+    Validate config:
+    ```bash
+    docker-compose config
+    ```
+  </Card>
+  
+  <Card title="Check Health" icon="heart-pulse">
+    Test health endpoint:
+    ```bash
+    curl http://localhost:5000/health
+    ```
+  </Card>
+</CardGroup>
+
+<Tip>
+  If you're still having issues after trying these solutions, check the source code for specific error handling:
+  
+  - **Configuration**: `config.py:44`
+  - **RPC connection**: `scanner.py`
+  - **Webhook server**: `webhook.py:15`
+  - **Database**: `models.py`
+</Tip>

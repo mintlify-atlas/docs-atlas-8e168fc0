@@ -1,0 +1,173 @@
+---
+title: BaseChainScanner
+description: Blockchain scanner for detecting new contract deployments on Base
+---
+
+## Overview
+
+The `BaseChainScanner` component monitors the Base blockchain for new contract deployments. It scans blocks, identifies contract creation transactions, and retrieves contract metadata from Basescan.
+
+## Initialization
+
+```python
+from scanner import BaseChainScanner
+
+scanner = BaseChainScanner(
+    rpc_url=config.base_rpc_url,
+    basescan_api_key=config.basescan_api_key,
+    min_contract_size=config.min_contract_size
+)
+```
+
+### Parameters
+
+<ParamField path="rpc_url" type="str" required>
+  Base RPC endpoint URL for blockchain interaction
+</ParamField>
+
+<ParamField path="basescan_api_key" type="str" required>
+  API key for Basescan API access
+</ParamField>
+
+<ParamField path="min_contract_size" type="int" default="100">
+  Minimum bytecode size to filter out small/proxy contracts
+</ParamField>
+
+## Key Methods
+
+### scan_blocks()
+
+Scans a range of blocks for contract deployments.
+
+```python
+deployments = scanner.scan_blocks(start_block, end_block)
+```
+
+**Parameters:**
+- `start_block` (int): Starting block number
+- `end_block` (int): Ending block number
+
+**Returns:** `list[ContractDeployment]` - List of detected contract deployments
+
+### get_latest_block()
+
+Retrieves the latest block number from the blockchain.
+
+```python
+latest_block = scanner.get_latest_block()
+```
+
+**Returns:** `int` - Latest block number
+
+### is_contract_verified()
+
+Checks if a contract is verified on Basescan.
+
+```python
+is_verified = scanner.is_contract_verified(address)
+```
+
+**Parameters:**
+- `address` (str): Contract address to check
+
+**Returns:** `bool` - True if contract is verified
+
+### get_contract_source()
+
+Retrieves verified contract source code from Basescan.
+
+```python
+source_info = scanner.get_contract_source(address)
+```
+
+**Returns:** `dict` with keys:
+- `contract_name`: Name of the contract
+- `source_code`: Solidity source code
+- `compiler_version`: Compiler version used
+- `optimization_used`: Whether optimization was enabled
+- `abi`: Contract ABI
+- `constructor_arguments`: Constructor arguments
+- `implementation`: Implementation address (for proxies)
+
+### get_contract_metadata()
+
+Retrieves contract metadata including extracted GitHub URLs.
+
+```python
+metadata = scanner.get_contract_metadata(address)
+```
+
+**Returns:** `dict` with contract information and extracted social links
+
+## ContractDeployment Data Class
+
+```python
+@dataclass
+class ContractDeployment:
+    address: str              # Contract address
+    deployer: str             # Deployer address
+    tx_hash: str              # Deployment transaction hash
+    block_number: int         # Block number of deployment
+    timestamp: datetime       # Deployment timestamp
+    bytecode_size: int        # Size of deployed bytecode
+```
+
+## Usage Example
+
+From `bot.py:157-180`:
+
+```python
+def _scan_for_contracts(self) -> list[ContractDeployment]:
+    """Scan blockchain for new contract deployments."""
+    try:
+        latest_block = self.scanner.get_latest_block()
+
+        # Determine start block
+        if self.last_block_scanned > 0:
+            start_block = self.last_block_scanned + 1
+        else:
+            start_block = max(0, latest_block - self.config.blocks_to_scan + 1)
+
+        # Scan blocks
+        deployments = self.scanner.scan_blocks(start_block, latest_block)
+
+        # Update last scanned block
+        self.last_block_scanned = latest_block
+
+        logger.info(f"Scanned blocks {start_block} to {latest_block}, found {len(deployments)} deployments")
+
+        return deployments
+
+    except Exception as e:
+        logger.error(f"Error scanning blocks: {e}")
+        return []
+```
+
+## Features
+
+<CardGroup cols={2}>
+  <Card title="Retry Logic" icon="rotate">
+    Built-in exponential backoff retry mechanism for RPC calls
+  </Card>
+  <Card title="Size Filtering" icon="filter">
+    Filters out contracts below minimum bytecode size
+  </Card>
+  <Card title="Verification Check" icon="check">
+    Validates contract verification status on Basescan
+  </Card>
+  <Card title="GitHub Extraction" icon="github">
+    Automatically extracts GitHub URLs from source code comments
+  </Card>
+</CardGroup>
+
+## Error Handling
+
+The scanner includes robust error handling:
+- Automatic retries with exponential backoff (3 attempts by default)
+- Connection verification on initialization
+- Graceful handling of failed block/transaction retrieval
+- Logging of all errors with context
+
+<Note>
+  The scanner uses Web3.py for blockchain interaction and requires a reliable RPC endpoint. Rate limiting is handled automatically.
+</Note>

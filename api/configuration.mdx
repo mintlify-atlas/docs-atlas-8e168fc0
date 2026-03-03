@@ -1,0 +1,312 @@
+---
+title: "Configuration"
+description: "Configuration management and environment variables for Base Audit Bot"
+---
+
+The Base Audit Bot uses a centralized `Config` dataclass to manage all configuration settings. Configuration is loaded from environment variables using the `dotenv` package.
+
+## Config Class
+
+The `Config` dataclass contains all application settings organized by category.
+
+### Base Chain Configuration
+
+<ResponseField name="base_rpc_url" type="str" required>
+  RPC endpoint URL for connecting to the Base blockchain.
+  
+  **Environment Variable:** `BASE_RPC_URL`
+  
+  **Default:** `"https://mainnet.base.org"`
+</ResponseField>
+
+<ResponseField name="basescan_api_key" type="str" required>
+  API key for Basescan to fetch contract source code and verification status.
+  
+  **Environment Variable:** `BASESCAN_API_KEY`
+  
+  **Required:** Yes (no default)
+</ResponseField>
+
+### Anthropic Configuration
+
+<ResponseField name="anthropic_api_key" type="str" required>
+  API key for Anthropic Claude to perform AI-powered smart contract audits.
+  
+  **Environment Variable:** `ANTHROPIC_API_KEY`
+  
+  **Required:** Yes (no default)
+</ResponseField>
+
+### Twitter Configuration
+
+<ResponseField name="twitter_api_key" type="str" required>
+  Twitter API key (Consumer Key) for posting tweets.
+  
+  **Environment Variable:** `TWITTER_API_KEY`
+  
+  **Required:** Yes (no default)
+</ResponseField>
+
+<ResponseField name="twitter_api_secret" type="str" required>
+  Twitter API secret (Consumer Secret) for authentication.
+  
+  **Environment Variable:** `TWITTER_API_SECRET`
+  
+  **Required:** Yes (no default)
+</ResponseField>
+
+<ResponseField name="twitter_access_token" type="str" required>
+  Twitter access token for the bot's account.
+  
+  **Environment Variable:** `TWITTER_ACCESS_TOKEN`
+  
+  **Required:** Yes (no default)
+</ResponseField>
+
+<ResponseField name="twitter_access_secret" type="str" required>
+  Twitter access token secret for authentication.
+  
+  **Environment Variable:** `TWITTER_ACCESS_SECRET`
+  
+  **Required:** Yes (no default)
+</ResponseField>
+
+<ResponseField name="twitter_bearer_token" type="str">
+  Twitter bearer token for read-only operations.
+  
+  **Environment Variable:** `TWITTER_BEARER_TOKEN`
+  
+  **Default:** `""` (empty string)
+</ResponseField>
+
+### Webhook Configuration
+
+<ResponseField name="webhook_secret" type="str">
+  Secret token for validating GitHub webhook requests.
+  
+  **Environment Variable:** `WEBHOOK_SECRET`
+  
+  **Default:** `""` (empty string)
+</ResponseField>
+
+<ResponseField name="webhook_port" type="int">
+  Port number for the webhook server to listen on.
+  
+  **Environment Variable:** `WEBHOOK_PORT`
+  
+  **Default:** `5000`
+</ResponseField>
+
+### Bot Settings
+
+<ResponseField name="scan_interval_minutes" type="int">
+  How often (in minutes) to scan the blockchain for new contract deployments.
+  
+  **Environment Variable:** `SCAN_INTERVAL_MINUTES`
+  
+  **Default:** `15`
+  
+  **Validation:** Must be at least 1
+</ResponseField>
+
+<ResponseField name="blocks_to_scan" type="int">
+  Number of recent blocks to scan for contract deployments in each scan cycle.
+  
+  **Environment Variable:** `BLOCKS_TO_SCAN`
+  
+  **Default:** `100`
+  
+  **Validation:** Must be at least 1
+</ResponseField>
+
+<ResponseField name="min_contract_size" type="int">
+  Minimum bytecode size (in bytes) for a contract to be considered for auditing. Filters out trivial contracts.
+  
+  **Environment Variable:** `MIN_CONTRACT_SIZE`
+  
+  **Default:** `100`
+</ResponseField>
+
+<ResponseField name="log_level" type="str">
+  Logging level for the application.
+  
+  **Environment Variable:** `LOG_LEVEL`
+  
+  **Default:** `"INFO"`
+  
+  **Options:** `"DEBUG"`, `"INFO"`, `"WARNING"`, `"ERROR"`, `"CRITICAL"`
+</ResponseField>
+
+### Path Configuration
+
+<ResponseField name="database_path" type="Path">
+  Path to the SQLite database file.
+  
+  **Environment Variable:** `DATABASE_PATH`
+  
+  **Default:** `"./data/bot.db"`
+</ResponseField>
+
+<ResponseField name="temp_dir" type="Path">
+  Directory for temporarily cloning repositories during audits.
+  
+  **Environment Variable:** `TEMP_DIR`
+  
+  **Default:** `"./temp_repos"`
+</ResponseField>
+
+## Loading Configuration
+
+### from_env() Class Method
+
+Loads configuration from environment variables. Validates that all required fields are present.
+
+```python
+config = Config.from_env()
+```
+
+**Raises:** `ValueError` if any required environment variables are missing.
+
+**Required Variables:**
+- `BASE_RPC_URL`
+- `BASESCAN_API_KEY`
+- `ANTHROPIC_API_KEY`
+- `TWITTER_API_KEY`
+- `TWITTER_API_SECRET`
+- `TWITTER_ACCESS_TOKEN`
+- `TWITTER_ACCESS_SECRET`
+
+### validate() Method
+
+Validates configuration values to ensure they are within acceptable ranges.
+
+```python
+config.validate()  # Returns True or raises ValueError
+```
+
+**Validation Rules:**
+- `base_rpc_url` must start with `"http"` or `"https"`
+- `scan_interval_minutes` must be at least 1
+- `blocks_to_scan` must be at least 1
+
+## Helper Function
+
+### get_config()
+
+Convenience function that loads and validates configuration in one step.
+
+```python
+from config import get_config
+
+config = get_config()
+```
+
+This is equivalent to:
+
+```python
+config = Config.from_env()
+config.validate()
+```
+
+## Usage Example
+
+### Setting Up Environment
+
+Create a `.env` file in your project root:
+
+```bash
+# Base Chain
+BASE_RPC_URL=https://mainnet.base.org
+BASESCAN_API_KEY=your_basescan_api_key
+
+# Anthropic
+ANTHROPIC_API_KEY=your_anthropic_api_key
+
+# Twitter
+TWITTER_API_KEY=your_twitter_api_key
+TWITTER_API_SECRET=your_twitter_api_secret
+TWITTER_ACCESS_TOKEN=your_access_token
+TWITTER_ACCESS_SECRET=your_access_secret
+TWITTER_BEARER_TOKEN=your_bearer_token
+
+# Webhook (optional)
+WEBHOOK_SECRET=your_webhook_secret
+WEBHOOK_PORT=5000
+
+# Bot Settings
+SCAN_INTERVAL_MINUTES=15
+BLOCKS_TO_SCAN=100
+MIN_CONTRACT_SIZE=100
+LOG_LEVEL=INFO
+
+# Paths
+DATABASE_PATH=./data/bot.db
+TEMP_DIR=./temp_repos
+```
+
+### Loading in Application
+
+```python
+import logging
+from config import get_config
+from models import Database
+from scanner import BaseChainScanner
+from auditor import SolidityAuditor
+
+# Load configuration
+config = get_config()
+
+# Set up logging
+logging.basicConfig(
+    level=config.log_level,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
+# Initialize components
+db = Database(config.database_path)
+scanner = BaseChainScanner(
+    rpc_url=config.base_rpc_url,
+    basescan_api_key=config.basescan_api_key,
+    min_contract_size=config.min_contract_size
+)
+auditor = SolidityAuditor(
+    anthropic_api_key=config.anthropic_api_key,
+    temp_dir=config.temp_dir
+)
+```
+
+### Accessing Configuration Values
+
+```python
+config = get_config()
+
+# Access values directly
+print(f"Scanning {config.blocks_to_scan} blocks every {config.scan_interval_minutes} minutes")
+print(f"Database: {config.database_path}")
+print(f"RPC URL: {config.base_rpc_url}")
+
+# Use in conditionals
+if config.webhook_secret:
+    print("Webhook authentication enabled")
+```
+
+## Environment Variables Reference
+
+| Variable | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `BASE_RPC_URL` | str | Yes | `https://mainnet.base.org` | Base blockchain RPC endpoint |
+| `BASESCAN_API_KEY` | str | Yes | - | Basescan API key |
+| `ANTHROPIC_API_KEY` | str | Yes | - | Anthropic Claude API key |
+| `TWITTER_API_KEY` | str | Yes | - | Twitter Consumer Key |
+| `TWITTER_API_SECRET` | str | Yes | - | Twitter Consumer Secret |
+| `TWITTER_ACCESS_TOKEN` | str | Yes | - | Twitter Access Token |
+| `TWITTER_ACCESS_SECRET` | str | Yes | - | Twitter Access Secret |
+| `TWITTER_BEARER_TOKEN` | str | No | `""` | Twitter Bearer Token |
+| `WEBHOOK_SECRET` | str | No | `""` | GitHub webhook secret |
+| `WEBHOOK_PORT` | int | No | `5000` | Webhook server port |
+| `SCAN_INTERVAL_MINUTES` | int | No | `15` | Blockchain scan frequency |
+| `BLOCKS_TO_SCAN` | int | No | `100` | Blocks per scan cycle |
+| `MIN_CONTRACT_SIZE` | int | No | `100` | Minimum contract bytecode size |
+| `LOG_LEVEL` | str | No | `INFO` | Logging level |
+| `DATABASE_PATH` | str | No | `./data/bot.db` | SQLite database path |
+| `TEMP_DIR` | str | No | `./temp_repos` | Temporary clone directory |

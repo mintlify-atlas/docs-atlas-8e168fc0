@@ -1,0 +1,453 @@
+---
+title: Database
+description: SQLite database manager for storing contracts, audits, and tweets
+---
+
+## Overview
+
+The `Database` component manages all persistent storage for the Base Audit Bot using SQLite. It handles contracts, audits, tweets, monitored repositories, and blocklists.
+
+## Initialization
+
+```python
+from models import Database
+from pathlib import Path
+
+db = Database(db_path=Path("./data/audit_bot.db"))
+```
+
+### Parameters
+
+<ParamField path="db_path" type="Path" required>
+  Path to SQLite database file (created if doesn't exist)
+</ParamField>
+
+## Database Schema
+
+### contracts
+
+Stores deployed contract information.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | INTEGER | Primary key |
+| address | TEXT | Contract address (unique) |
+| deployer | TEXT | Deployer address |
+| deploy_time | TIMESTAMP | Deployment timestamp |
+| tx_hash | TEXT | Deployment tx hash (unique) |
+| repo_url | TEXT | GitHub repository URL |
+| last_audit | TIMESTAMP | Last audit timestamp |
+| contract_name | TEXT | Contract name |
+| is_verified | BOOLEAN | Verification status |
+| created_at | TIMESTAMP | Record creation time |
+
+### audits
+
+Stores audit results.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | INTEGER | Primary key |
+| contract_id | INTEGER | Foreign key to contracts |
+| audit_date | TIMESTAMP | Audit timestamp |
+| critical_count | INTEGER | Critical issues found |
+| high_count | INTEGER | High severity issues |
+| medium_count | INTEGER | Medium severity issues |
+| low_count | INTEGER | Low severity issues |
+| summary | TEXT | Audit summary |
+| full_report | TEXT | Full audit report (JSON) |
+| created_at | TIMESTAMP | Record creation time |
+
+### tweets
+
+Stores posted tweets.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | INTEGER | Primary key |
+| audit_id | INTEGER | Foreign key to audits |
+| tweet_id | TEXT | Twitter tweet ID (unique) |
+| posted_at | TIMESTAMP | Post timestamp |
+| tweet_type | TEXT | 'audit', 'update', 'summary' |
+| content | TEXT | Tweet content |
+| created_at | TIMESTAMP | Record creation time |
+
+### monitored_repos
+
+Tracks repositories monitored via webhooks.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | INTEGER | Primary key |
+| repo_url | TEXT | Repository URL (unique) |
+| contract_id | INTEGER | Foreign key to contracts |
+| last_commit_sha | TEXT | Last known commit SHA |
+| added_at | TIMESTAMP | When monitoring started |
+
+### blocklist
+
+Stores blocked addresses.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | INTEGER | Primary key |
+| address | TEXT | Blocked address (unique) |
+| reason | TEXT | Reason for blocking |
+| added_at | TIMESTAMP | When added |
+
+## Data Classes
+
+### Contract
+
+```python
+@dataclass
+class Contract:
+    id: Optional[int]
+    address: str
+    deployer: str
+    deploy_time: datetime
+    tx_hash: str
+    repo_url: Optional[str]
+    last_audit: Optional[datetime]
+    contract_name: Optional[str] = None
+    is_verified: bool = False
+```
+
+### Audit
+
+```python
+@dataclass
+class Audit:
+    id: Optional[int]
+    contract_id: int
+    audit_date: datetime
+    critical_count: int
+    high_count: int
+    medium_count: int
+    low_count: int
+    summary: str
+    full_report: Optional[str] = None
+```
+
+### Tweet
+
+```python
+@dataclass
+class Tweet:
+    id: Optional[int]
+    audit_id: Optional[int]
+    tweet_id: str
+    posted_at: datetime
+    tweet_type: str  # 'audit', 'update', 'summary'
+    content: str
+```
+
+## Contract Operations
+
+### add_contract()
+
+Adds a new contract to the database.
+
+```python
+contract_id = db.add_contract(contract)
+```
+
+**Parameters:**
+- `contract` (Contract): Contract object to add
+
+**Returns:** `int` - Database ID of inserted contract
+
+### get_contract_by_address()
+
+Retrieves a contract by its address.
+
+```python
+contract = db.get_contract_by_address("0x...")
+```
+
+**Returns:** `Contract | None` - Contract object or None if not found
+
+### update_contract_repo()
+
+Updates a contract's repository URL.
+
+```python
+db.update_contract_repo(address, repo_url)
+```
+
+### update_contract_audit_time()
+
+Updates a contract's last audit timestamp.
+
+```python
+db.update_contract_audit_time(address)
+```
+
+### get_unaudited_contracts()
+
+Retrieves contracts that haven't been audited.
+
+```python
+contracts = db.get_unaudited_contracts(limit=50)
+```
+
+**Returns:** `list[Contract]` - List of unaudited contracts with repository URLs
+
+## Audit Operations
+
+### add_audit()
+
+Adds a new audit result.
+
+```python
+audit_id = db.add_audit(audit)
+```
+
+**Parameters:**
+- `audit` (Audit): Audit object to add
+
+**Returns:** `int` - Database ID of inserted audit
+
+### get_audit_by_contract_id()
+
+Retrieves the most recent audit for a contract.
+
+```python
+audit = db.get_audit_by_contract_id(contract_id)
+```
+
+**Returns:** `Audit | None` - Most recent audit or None
+
+### get_daily_stats()
+
+Retrieves audit statistics for today.
+
+```python
+stats = db.get_daily_stats()
+```
+
+**Returns:** `dict` with keys:
+- `total_audits`: Total audits today
+- `total_critical`: Total critical issues
+- `total_high`: Total high severity issues
+- `total_medium`: Total medium severity issues
+- `total_low`: Total low severity issues
+
+## Tweet Operations
+
+### add_tweet()
+
+Records a posted tweet.
+
+```python
+tweet_id = db.add_tweet(tweet)
+```
+
+**Parameters:**
+- `tweet` (Tweet): Tweet object to add
+
+**Returns:** `int` - Database ID of inserted tweet
+
+## Monitored Repository Operations
+
+### add_monitored_repo()
+
+Adds a repository to monitor.
+
+```python
+db.add_monitored_repo(repo_url, contract_id)
+```
+
+### get_monitored_repos()
+
+Retrieves all monitored repositories.
+
+```python
+repos = db.get_monitored_repos()
+```
+
+**Returns:** `list[dict]` - List of repository records
+
+### update_repo_commit()
+
+Updates the last known commit for a repository.
+
+```python
+db.update_repo_commit(repo_url, commit_sha)
+```
+
+## Blocklist Operations
+
+### is_blocklisted()
+
+Checks if an address is blocklisted.
+
+```python
+if db.is_blocklisted(address):
+    # Skip processing
+    pass
+```
+
+**Returns:** `bool` - True if address is blocklisted
+
+### add_to_blocklist()
+
+Adds an address to the blocklist.
+
+```python
+db.add_to_blocklist(address, reason="Spam contract")
+```
+
+## Statistics Operations
+
+### get_contracts_scanned_today()
+
+Retrieves count of contracts scanned today.
+
+```python
+count = db.get_contracts_scanned_today()
+```
+
+**Returns:** `int` - Number of contracts scanned today
+
+## Usage Examples
+
+### Saving a New Contract
+
+From `bot.py:218-233`:
+
+```python
+# Create contract record
+contract = Contract(
+    id=None,
+    address=address,
+    deployer=deployment.deployer,
+    deploy_time=deployment.timestamp,
+    tx_hash=deployment.tx_hash,
+    repo_url=repo_url,
+    last_audit=None,
+    contract_name=metadata.get("contract_name") if metadata else None,
+    is_verified=is_verified
+)
+
+contract_id = self.db.add_contract(contract)
+contract.id = contract_id
+
+logger.info(f"Saved contract {address} (verified: {is_verified}, repo: {repo_url})")
+```
+
+### Saving Audit Results
+
+From `bot.py:253-273`:
+
+```python
+# Save audit result
+audit = Audit(
+    id=None,
+    contract_id=contract.id,
+    audit_date=datetime.utcnow(),
+    critical_count=report.critical_count,
+    high_count=report.high_count,
+    medium_count=report.medium_count,
+    low_count=report.low_count,
+    summary=report.summary,
+    full_report=None
+)
+
+audit_id = self.db.add_audit(audit)
+audit.id = audit_id
+
+# Update contract
+self.db.update_contract_audit_time(contract.address)
+
+# Add to monitored repos
+self.db.add_monitored_repo(repo_url, contract.id)
+```
+
+### Checking Blocklist
+
+From `bot.py:197-200`:
+
+```python
+# Check blocklist
+if self.db.is_blocklisted(address) or self.db.is_blocklisted(deployment.deployer):
+    logger.info(f"Skipping blocklisted address: {address}")
+    return
+```
+
+### Getting Daily Statistics
+
+From `bot.py:410-420`:
+
+```python
+try:
+    stats = self.db.get_daily_stats()
+    stats["contracts_scanned"] = self.db.get_contracts_scanned_today()
+
+    if stats["total_audits"] > 0:
+        tweet = self.twitter_bot.post_daily_summary(stats)
+
+        if tweet:
+            self.db.add_tweet(tweet)
+            self.last_daily_summary = now
+            logger.info("Posted daily summary")
+except Exception as e:
+    logger.error(f"Error posting daily summary: {e}")
+```
+
+## Features
+
+<CardGroup cols={2}>
+  <Card title="Automatic Schema" icon="database">
+    Creates all tables and indexes automatically on initialization
+  </Card>
+  <Card title="Type Safety" icon="shield">
+    Uses dataclasses for type-safe data operations
+  </Card>
+  <Card title="Efficient Queries" icon="bolt">
+    Indexed queries for fast lookups by address and foreign keys
+  </Card>
+  <Card title="Case Insensitive" icon="font-case">
+    Stores all addresses in lowercase for consistent lookups
+  </Card>
+</CardGroup>
+
+## Connection Management
+
+The database uses connection pooling with automatic cleanup:
+
+```python
+def _get_connection(self) -> sqlite3.Connection:
+    """Get database connection with row factory."""
+    conn = sqlite3.connect(str(self.db_path))
+    conn.row_factory = sqlite3.Row  # Access columns by name
+    return conn
+```
+
+Connections are closed after each operation to prevent locking issues.
+
+## Indexes
+
+The database creates indexes for optimal query performance:
+
+```sql
+CREATE INDEX idx_contracts_address ON contracts(address)
+CREATE INDEX idx_contracts_deployer ON contracts(deployer)
+CREATE INDEX idx_audits_contract_id ON audits(contract_id)
+CREATE INDEX idx_tweets_audit_id ON tweets(audit_id)
+```
+
+<Note>
+  All addresses are normalized to lowercase before storage to ensure consistent lookups regardless of input case.
+</Note>
+
+## Data Integrity
+
+- Unique constraints on contract addresses and transaction hashes
+- Foreign key relationships between tables
+- INSERT OR IGNORE for idempotent operations
+- Timestamps stored in ISO format for portability
+
+<Tip>
+  The database is automatically created with the proper schema on first use. No manual setup is required.
+</Tip>

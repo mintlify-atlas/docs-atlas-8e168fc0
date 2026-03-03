@@ -1,0 +1,340 @@
+---
+title: Webhook Server
+description: GitHub webhook server for monitoring repository updates
+---
+
+## Overview
+
+The `WebhookServer` component is a Flask-based server that receives GitHub webhook events for monitoring repository updates. It detects Solidity file changes and triggers automated re-audits.
+
+## Initialization
+
+```python
+from webhook import WebhookServer
+
+server = WebhookServer(
+    webhook_secret="your-webhook-secret",
+    port=5000,
+    on_push=handle_push,
+    on_solidity_change=handle_solidity_change
+)
+```
+
+### Parameters
+
+<ParamField path="webhook_secret" type="str" required>
+  GitHub webhook secret for signature verification
+</ParamField>
+
+<ParamField path="port" type="int" default="5000">
+  Port number for the webhook server
+</ParamField>
+
+<ParamField path="on_push" type="Callable" optional>
+  Callback function for push events
+</ParamField>
+
+<ParamField path="on_solidity_change" type="Callable" optional>
+  Callback function for Solidity file changes
+</ParamField>
+
+## Key Methods
+
+### start()
+
+Starts the webhook server.
+
+```python
+server.start(threaded=True)
+```
+
+**Parameters:**
+- `threaded` (bool): If True, runs server in a daemon thread
+
+### stop()
+
+Stops the webhook server.
+
+```python
+server.stop()
+```
+
+<Note>
+  The server runs as a daemon thread, so it automatically stops when the main process exits.
+</Note>
+
+## Endpoints
+
+### GET /health
+
+Health check endpoint.
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "timestamp": "2024-01-15T10:30:00.000000"
+}
+```
+
+### POST /webhook/github
+
+GitHub webhook event receiver.
+
+**Headers:**
+- `X-GitHub-Event`: Event type (e.g., "push", "ping")
+- `X-Hub-Signature-256`: HMAC SHA256 signature for verification
+
+**Supported Events:**
+- `push`: Repository push events
+- `ping`: Webhook setup verification
+
+## Event Data Structure
+
+### Push Event Data
+
+```python
+event_data = {
+    "repo_name": "owner/repository",
+    "repo_url": "https://github.com/owner/repository",
+    "ref": "refs/heads/main",
+    "commit_sha": "abc1234",
+    "commit_message": "Fix security issue",
+    "commit_url": "https://github.com/owner/repo/commit/abc1234",
+    "author": "Developer Name",
+    "solidity_changed": True,
+    "modified_files": ["contracts/Token.sol", "contracts/Vault.sol"]
+}
+```
+
+## Callback Functions
+
+Callbacks receive event data dictionaries:
+
+```python
+def on_push(event_data: dict):
+    """Handle push events."""
+    repo_name = event_data["repo_name"]
+    commit_message = event_data["commit_message"]
+    # Process the push event
+
+def on_solidity_change(event_data: dict):
+    """Handle Solidity file changes."""
+    repo_url = event_data["repo_url"]
+    # Trigger re-audit
+```
+
+## Usage Example
+
+From `bot.py:86-96`:
+
+```python
+# Webhook server
+self.webhook_server: Optional[WebhookServer] = None
+if config.webhook_secret:
+    self.webhook_server = create_webhook_handler(
+        db=self.db,
+        twitter_bot=self.twitter_bot,
+        auditor=self.auditor,
+        webhook_secret=config.webhook_secret,
+        port=config.webhook_port
+    )
+    logger.info(f"Webhook server configured on port {config.webhook_port}")
+```
+
+From `bot.py:108-111`:
+
+```python
+# Start webhook server if configured
+if self.webhook_server:
+    self.webhook_server.start(threaded=True)
+    logger.info("Webhook server started")
+```
+
+## Helper Function: create_webhook_handler()
+
+Creates a configured webhook server with integrated handlers.
+
+```python
+from webhook import create_webhook_handler
+
+server = create_webhook_handler(
+    db=database,
+    twitter_bot=twitter_bot,
+    auditor=auditor,
+    webhook_secret="your-secret",
+    port=5000
+)
+```
+
+### Implementation
+
+From `webhook.py:197-259`:
+
+```python
+def create_webhook_handler(
+    db,
+    twitter_bot,
+    auditor,
+    webhook_secret: str,
+    port: int = 5000
+) -> WebhookServer:
+    """Create a configured webhook server with handlers."""
+
+    def on_push(event_data: dict):
+        """Handle push events - tweet about updates."""
+        repo_name = event_data["repo_name"]
+        commit_message = event_data["commit_message"]
+        commit_url = event_data["commit_url"]
+
+        # Post tweet about the update
+        if twitter_bot:
+            tweet = twitter_bot.post_repo_update(
+                repo_name=repo_name,
+                commit_message=commit_message,
+                commit_url=commit_url
+            )
+
+            if tweet and db:
+                db.add_tweet(tweet)
+                logger.info(f"Tweeted repo update for {repo_name}")
+
+        # Update last commit in database
+        if db:
+            repo_url = event_data["repo_url"]
+            commit_sha = event_data["commit_sha"]
+            db.update_repo_commit(repo_url, commit_sha)
+
+    def on_solidity_change(event_data: dict):
+        """Handle Solidity file changes - trigger re-audit."""
+        repo_url = event_data["repo_url"]
+        repo_name = event_data["repo_name"]
+
+        logger.info(f"Solidity files changed in {repo_name}, triggering re-audit")
+
+        # Queue re-audit
+        if auditor:
+            try:
+                # Perform audit
+                report = auditor.audit_repo(repo_url)
+
+                if report and not report.error:
+                    logger.info(f"Re-audit completed for {repo_name}: {report.total_findings} issues")
+
+                    # Tweet about significant new findings
+                    if report.critical_count > 0 or report.high_count > 0:
+                        logger.warning(f"New critical/high issues found in {repo_name}")
+
+            except Exception as e:
+                logger.error(f"Re-audit failed for {repo_name}: {e}")
+
+    return WebhookServer(
+        webhook_secret=webhook_secret,
+        port=port,
+        on_push=on_push,
+        on_solidity_change=on_solidity_change
+    )
+```
+
+## Signature Verification
+
+The server verifies GitHub webhook signatures using HMAC SHA256:
+
+```python
+def _verify_signature(self, payload: bytes, signature: str) -> bool:
+    """Verify GitHub webhook signature."""
+    if not signature or not signature.startswith("sha256="):
+        return False
+
+    expected_signature = "sha256=" + hmac.new(
+        self.webhook_secret.encode(),
+        payload,
+        hashlib.sha256
+    ).hexdigest()
+
+    return hmac.compare_digest(signature, expected_signature)
+```
+
+<Warning>
+  Always use a strong webhook secret and verify signatures. Unverified webhooks can be exploited for malicious purposes.
+</Warning>
+
+## Solidity File Detection
+
+The server automatically detects when Solidity files are modified:
+
+```python
+for commit in commits:
+    modified = commit.get("modified", [])
+    added = commit.get("added", [])
+    all_files = modified + added
+
+    for file in all_files:
+        if file.endswith(".sol"):
+            solidity_changed = True
+            break
+```
+
+When Solidity files change, the `on_solidity_change` callback is triggered for automated re-audits.
+
+## Features
+
+<CardGroup cols={2}>
+  <Card title="Secure Verification" icon="shield">
+    HMAC SHA256 signature verification for all webhooks
+  </Card>
+  <Card title="Automatic Re-audits" icon="rotate">
+    Triggers audits when Solidity files are modified
+  </Card>
+  <Card title="Threaded Operation" icon="server">
+    Runs in background thread without blocking main bot
+  </Card>
+  <Card title="Health Checks" icon="heart-pulse">
+    Built-in health check endpoint for monitoring
+  </Card>
+</CardGroup>
+
+## Configuration
+
+### GitHub Webhook Setup
+
+1. Go to your GitHub repository settings
+2. Navigate to Webhooks → Add webhook
+3. Set Payload URL: `http://your-server:5000/webhook/github`
+4. Set Content type: `application/json`
+5. Set Secret: Your webhook secret
+6. Select events: "Just the push event"
+7. Save webhook
+
+### Testing
+
+Test the webhook with a health check:
+
+```bash
+curl http://localhost:5000/health
+```
+
+Expected response:
+```json
+{"status": "healthy", "timestamp": "..."}
+```
+
+## Error Handling
+
+The server includes comprehensive error handling:
+
+- Invalid signatures return 401 Unauthorized
+- Invalid JSON returns 400 Bad Request  
+- Callback exceptions are caught and logged
+- All errors are logged with full context
+
+```python
+@self.app.errorhandler(Exception)
+def handle_error(error):
+    logger.error(f"Webhook error: {error}")
+    return jsonify({"error": str(error)}), 500
+```
+
+<Info>
+  The webhook server uses Flask with production-safe settings (debug=False, use_reloader=False) suitable for deployment.
+</Info>

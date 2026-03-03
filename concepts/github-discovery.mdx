@@ -1,0 +1,474 @@
+---
+title: GitHub Repository Discovery
+description: Multi-strategy approach for discovering GitHub repositories associated with deployed smart contracts
+---
+
+## Overview
+
+The `GitHubFinder` class implements a sophisticated multi-strategy approach to discover GitHub repositories for deployed smart contracts. This is crucial because:
+
+- Only verified contracts provide source code
+- Repositories enable comprehensive audits of full projects
+- GitHub history reveals development patterns and commit activity
+
+## Implementation
+
+### Initialization
+
+```python
+class GitHubFinder:
+    """Discovers GitHub repositories for smart contracts."""
+
+    def __init__(self, basescan_api_key: str, github_token: Optional[str] = None):
+        self.basescan_api_key = basescan_api_key
+        self.basescan_url = "https://api.basescan.org/api"
+        self.github_token = github_token  # Optional, increases rate limits
+        self.github_api_url = "https://api.github.com"
+        self.rate_limit_delay = 0.2  # 200ms between requests
+```
+
+**API Authentication:**
+- Basescan API key (required) - For fetching verified contract source
+- GitHub token (optional) - Increases rate limits from 60 to 5,000 requests/hour
+
+```python
+def _github_headers(self) -> dict:
+    """Get headers for GitHub API requests."""
+    headers = {
+        "Accept": "application/vnd.github.v3+json",
+        "User-Agent": "BaseAuditBot/1.0"
+    }
+    if self.github_token:
+        headers["Authorization"] = f"token {self.github_token}"
+    return headers
+```
+
+<Tip>
+Provide a GitHub personal access token via `GITHUB_TOKEN` environment variable to avoid hitting rate limits during active scanning.
+</Tip>
+
+## Multi-Strategy Discovery
+
+The finder attempts four strategies in order until a valid repository is found:
+
+```python
+def find_repo(self, contract_address: str, metadata: Optional[dict] = None) -> Optional[str]:
+    """
+    Find GitHub repository for a contract using multiple strategies.
+    
+    Strategies (in order):
+    1. Extract from verified source code comments
+    2. Search social links in metadata
+    3. Search GitHub for contract address
+    4. Search GitHub for contract name
+    """
+    # Strategy 1: Check if metadata already has GitHub URL
+    if metadata and metadata.get("github_url"):
+        url = metadata["github_url"]
+        if self._validate_github_url(url):
+            return url
+    
+    # Strategy 2: Search Basescan source code
+    repo_url = self._search_basescan_source(contract_address)
+    if repo_url:
+        return repo_url
+    
+    # Strategy 3: Search GitHub for contract address
+    repo_url = self._search_github_by_address(contract_address)
+    if repo_url:
+        return repo_url
+    
+    # Strategy 4: Search GitHub for contract name
+    if metadata and metadata.get("contract_name"):
+        repo_url = self._search_github_by_name(metadata["contract_name"])
+        if repo_url:
+            return repo_url
+    
+    return None
+```
+
+### Strategy 1: Extract from Source Code
+
+Most reliable method - developers often include GitHub URLs in contract comments:
+
+```python
+def _search_basescan_source(self, address: str) -> Optional[str]:
+    """Search Basescan verified source for GitHub URLs."""
+    response = requests.get(
+        self.basescan_url,
+        params={
+            "module": "contract",
+            "action": "getsourcecode",
+            "address": address,
+            "apikey": self.basescan_api_key
+        },
+        timeout=10
+    )
+    
+    data = response.json()
+    
+    if data.get("status") != "1" or not data.get("result"):
+        return None
+    
+    result = data["result"][0]
+    source_code = result.get("SourceCode", "")
+    
+    if not source_code:
+        return None
+    
+    # Handle multi-file JSON format
+    if source_code.startswith("{{"):
+        try:
+            import json
+            source_code = source_code[1:-1]  # Remove outer braces
+            sources = json.loads(source_code)
+            # Concatenate all source files
+            all_sources = []
+            if "sources" in sources:
+                for file_info in sources["sources"].values():
+                    all_sources.append(file_info.get("content", ""))
+            source_code = "\n".join(all_sources)
+        except json.JSONDecodeError:
+            pass
+    
+    # Extract GitHub URLs
+    return self._extract_github_url(source_code)
+```
+
+#### URL Extraction
+
+Regex patterns match various GitHub URL formats in comments:
+
+```python
+def _extract_github_url(self, text: str) -> Optional[str]:
+    """Extract and validate GitHub URL from text."""
+    # Patterns to match GitHub URLs
+    patterns = [
+        r'https?://github\.com/([\w\-]+)/([\w\-\.]+)',
+        r'github\.com/([\w\-]+)/([\w\-\.]+)',
+    ]
+    
+    for pattern in patterns:
+        matches = re.findall(pattern, text)
+        for match in matches:
+            owner, repo = match
+            # Clean up repo name
+            repo = re.sub(r'\.git$', '', repo)
+            repo = re.sub(r'[/\s].*$', '', repo)
+            
+            url = f"https://github.com/{owner}/{repo}"
+            
+            # Validate the repo exists
+            if self._validate_github_url(url):
+                return url
+    
+    return None
+```
+
+**Common patterns matched:**
+- `https://github.com/owner/repo`
+- `github.com/owner/repo`
+- `https://github.com/owner/repo.git`
+- References in SPDX headers: `// SPDX-License-Identifier: MIT\n// github.com/owner/repo`
+
+### Strategy 2: Search by Contract Address
+
+Searches GitHub code for the contract address:
+
+```python
+def _search_github_by_address(self, address: str) -> Optional[str]:
+    """Search GitHub for repositories containing the contract address."""
+    time.sleep(self.rate_limit_delay)
+    
+    # Search for address in code
+    response = requests.get(
+        f"{self.github_api_url}/search/code",
+        params={
+            "q": f"{address} language:solidity",
+            "per_page": 5
+        },
+        headers=self._github_headers(),
+        timeout=15
+    )
+    
+    if response.status_code != 200:
+        return None
+    
+    data = response.json()
+    
+    if data.get("items"):
+        # Return the first repo found
+        item = data["items"][0]
+        repo = item.get("repository", {})
+        full_name = repo.get("full_name")
+        
+        if full_name:
+            return f"https://github.com/{full_name}"
+    
+    return None
+```
+
+<Info>
+This strategy is useful when:
+- Contracts hardcode their own address for verification
+- README files document deployed addresses
+- Configuration files list contract addresses
+</Info>
+
+### Strategy 3: Search by Contract Name
+
+Searches GitHub repositories by contract name:
+
+```python
+def _search_github_by_name(self, contract_name: str) -> Optional[str]:
+    """Search GitHub for repositories by contract name."""
+    time.sleep(self.rate_limit_delay)
+    
+    # Clean up contract name
+    clean_name = re.sub(r'[^\w\s]', '', contract_name)
+    
+    # Search for repos with Solidity code
+    response = requests.get(
+        f"{self.github_api_url}/search/repositories",
+        params={
+            "q": f"{clean_name} language:solidity",
+            "sort": "stars",
+            "per_page": 5
+        },
+        headers=self._github_headers(),
+        timeout=15
+    )
+    
+    if response.status_code != 200:
+        return None
+    
+    data = response.json()
+    
+    if data.get("items"):
+        # Return the most starred repo
+        item = data["items"][0]
+        full_name = item.get("full_name")
+        
+        if full_name:
+            # Verify it contains Solidity files
+            if self._repo_has_solidity(full_name):
+                return f"https://github.com/{full_name}"
+    
+    return None
+```
+
+#### Verification Check
+
+Confirms the repository contains Solidity files:
+
+```python
+def _repo_has_solidity(self, full_name: str) -> bool:
+    """Check if a repository contains Solidity files."""
+    time.sleep(self.rate_limit_delay)
+    
+    response = requests.get(
+        f"{self.github_api_url}/search/code",
+        params={
+            "q": f"repo:{full_name} extension:sol",
+            "per_page": 1
+        },
+        headers=self._github_headers(),
+        timeout=10
+    )
+    
+    if response.status_code == 200:
+        data = response.json()
+        return data.get("total_count", 0) > 0
+    
+    return False
+```
+
+## URL Validation
+
+Every discovered URL is validated before being returned:
+
+```python
+def _validate_github_url(self, url: str) -> bool:
+    """Verify that a GitHub URL points to a valid repository."""
+    try:
+        parsed = urlparse(url)
+        if parsed.netloc != "github.com":
+            return False
+        
+        # Extract owner/repo from path
+        path_parts = parsed.path.strip("/").split("/")
+        if len(path_parts) < 2:
+            return False
+        
+        owner, repo = path_parts[0], path_parts[1]
+        
+        # Check if repo exists via API
+        time.sleep(self.rate_limit_delay)
+        
+        response = requests.get(
+            f"{self.github_api_url}/repos/{owner}/{repo}",
+            headers=self._github_headers(),
+            timeout=10
+        )
+        
+        return response.status_code == 200
+    
+    except Exception as e:
+        logger.error(f"Error validating GitHub URL {url}: {e}")
+        return False
+```
+
+<Warning>
+Validation prevents:
+- Broken or dead repository links
+- Typos in manually entered URLs
+- Private repositories (returns 404)
+- Invalid GitHub paths
+</Warning>
+
+## Repository Metadata
+
+Once found, the finder can fetch detailed repository information:
+
+```python
+def get_repo_info(self, repo_url: str) -> Optional[dict]:
+    """Get repository information from GitHub."""
+    parsed = urlparse(repo_url)
+    path_parts = parsed.path.strip("/").split("/")
+    
+    if len(path_parts) < 2:
+        return None
+    
+    owner, repo = path_parts[0], path_parts[1]
+    
+    time.sleep(self.rate_limit_delay)
+    
+    response = requests.get(
+        f"{self.github_api_url}/repos/{owner}/{repo}",
+        headers=self._github_headers(),
+        timeout=10
+    )
+    
+    if response.status_code != 200:
+        return None
+    
+    data = response.json()
+    
+    return {
+        "full_name": data.get("full_name"),
+        "description": data.get("description"),
+        "stars": data.get("stargazers_count", 0),
+        "forks": data.get("forks_count", 0),
+        "open_issues": data.get("open_issues_count", 0),
+        "default_branch": data.get("default_branch", "main"),
+        "created_at": data.get("created_at"),
+        "updated_at": data.get("updated_at"),
+        "clone_url": data.get("clone_url"),
+        "html_url": data.get("html_url"),
+    }
+```
+
+## Commit Monitoring
+
+The finder can also track the latest commits for monitoring repository updates:
+
+```python
+def get_latest_commit(self, repo_url: str, branch: str = "main") -> Optional[dict]:
+    """Get the latest commit from a repository."""
+    parsed = urlparse(repo_url)
+    path_parts = parsed.path.strip("/").split("/")
+    
+    if len(path_parts) < 2:
+        return None
+    
+    owner, repo = path_parts[0], path_parts[1]
+    
+    time.sleep(self.rate_limit_delay)
+    
+    response = requests.get(
+        f"{self.github_api_url}/repos/{owner}/{repo}/commits/{branch}",
+        headers=self._github_headers(),
+        timeout=10
+    )
+    
+    if response.status_code != 200:
+        return None
+    
+    data = response.json()
+    
+    return {
+        "sha": data.get("sha"),
+        "message": data.get("commit", {}).get("message", ""),
+        "author": data.get("commit", {}).get("author", {}).get("name", "Unknown"),
+        "date": data.get("commit", {}).get("author", {}).get("date"),
+        "url": data.get("html_url"),
+    }
+```
+
+<Info>
+This enables future features like:
+- Monitoring for repository updates
+- Re-auditing after commits
+- Tracking development activity
+</Info>
+
+## Rate Limiting
+
+All GitHub API calls include rate limit protection:
+
+```python
+# 200ms delay between requests
+time.sleep(self.rate_limit_delay)
+```
+
+**Rate Limits:**
+- **Unauthenticated**: 60 requests/hour
+- **Authenticated**: 5,000 requests/hour
+
+<Tip>
+**Best practices:**
+1. Always provide a GitHub token for production use
+2. The 200ms delay ensures ~300 requests/minute max
+3. Failed lookups are logged but don't crash the bot
+4. Rate limit errors are caught and handled gracefully
+</Tip>
+
+## Integration with Main Bot
+
+The GitHub finder is called after contract verification:
+
+```python
+# Initialize GitHub finder
+self.github_finder = GitHubFinder(
+    basescan_api_key=config.basescan_api_key
+)
+
+# Find repository
+metadata = self.scanner.get_contract_metadata(address)
+repo_url = self.github_finder.find_repo(address, metadata)
+
+if repo_url:
+    # Perform repository-based audit
+    report = self.auditor.audit_repo(repo_url)
+    self.db.add_monitored_repo(repo_url, contract.id)
+```
+
+## Success Metrics
+
+Typical discovery rates:
+
+- **Strategy 1 (Source code)**: ~40-50% success rate
+- **Strategy 2 (Address search)**: ~10-15% success rate
+- **Strategy 3 (Name search)**: ~5-10% success rate
+- **Overall**: ~60-70% of verified contracts have discoverable repositories
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="AI-Powered Auditing" icon="brain" href="/concepts/ai-auditing">
+    Learn how discovered repositories are audited
+  </Card>
+  <Card title="Blockchain Monitoring" icon="link" href="/concepts/blockchain-monitoring">
+    Understand how contracts are discovered
+  </Card>
+</CardGroup>

@@ -1,0 +1,254 @@
+---
+title: "GitHubFinder"
+description: "Discovers and validates GitHub repositories associated with smart contracts using multiple search strategies."
+---
+
+## Overview
+
+The `GitHubFinder` class discovers GitHub repositories for smart contracts using multiple search strategies including source code analysis, GitHub API searches, and metadata extraction.
+
+## Class Definition
+
+```python
+from github_finder import GitHubFinder
+```
+
+## Initialization
+
+<ParamField path="basescan_api_key" type="str" required>
+  Basescan API key for retrieving verified contract source code
+</ParamField>
+
+<ParamField path="github_token" type="str" optional>
+  GitHub personal access token for higher API rate limits. Without a token, you're limited to 60 requests/hour.
+</ParamField>
+
+```python
+finder = GitHubFinder(
+    basescan_api_key="your_basescan_key",
+    github_token="your_github_token"  # Optional but recommended
+)
+```
+
+## Methods
+
+### find_repo(contract_address, metadata)
+
+Find GitHub repository for a contract using multiple strategies.
+
+<ParamField path="contract_address" type="str" required>
+  Smart contract address to search for
+</ParamField>
+
+<ParamField path="metadata" type="dict" optional>
+  Contract metadata from Basescan (may include contract name, source code, etc.)
+</ParamField>
+
+```python
+repo_url = finder.find_repo(
+    "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+    metadata={"contract_name": "MyToken"}
+)
+```
+
+<ResponseField name="return" type="str | None">
+  GitHub repository URL if found, None otherwise
+</ResponseField>
+
+**Search Strategies (in order):**
+1. Extract from metadata if already present
+2. Search Basescan verified source code for GitHub URLs
+3. Search GitHub code for the contract address
+4. Search GitHub repositories by contract name
+
+### get_repo_info(repo_url)
+
+Get detailed information about a GitHub repository.
+
+<ParamField path="repo_url" type="str" required>
+  GitHub repository URL
+</ParamField>
+
+```python
+info = finder.get_repo_info("https://github.com/owner/repo")
+```
+
+<ResponseField name="return" type="dict | None">
+  Repository information or None if not found:
+  - `full_name` - Owner/repo format (e.g., "owner/repo")
+  - `description` - Repository description
+  - `stars` - Number of stargazers
+  - `forks` - Number of forks
+  - `open_issues` - Number of open issues
+  - `default_branch` - Default branch name (usually "main" or "master")
+  - `created_at` - Repository creation date
+  - `updated_at` - Last update date
+  - `clone_url` - Git clone URL
+  - `html_url` - GitHub web URL
+</ResponseField>
+
+### get_latest_commit(repo_url, branch)
+
+Get the latest commit from a repository branch.
+
+<ParamField path="repo_url" type="str" required>
+  GitHub repository URL
+</ParamField>
+
+<ParamField path="branch" type="str" default="main">
+  Branch name to query
+</ParamField>
+
+```python
+commit = finder.get_latest_commit(
+    "https://github.com/owner/repo",
+    branch="main"
+)
+```
+
+<ResponseField name="return" type="dict | None">
+  Commit information or None if not found:
+  - `sha` - Commit SHA hash
+  - `message` - Commit message
+  - `author` - Author name
+  - `date` - Commit date
+  - `url` - GitHub URL to the commit
+</ResponseField>
+
+## Internal Methods
+
+These methods are used internally but can be called directly if needed:
+
+### _search_basescan_source(address)
+
+Search Basescan verified source code for GitHub URLs.
+
+<ParamField path="address" type="str" required>
+  Contract address to search
+</ParamField>
+
+<ResponseField name="return" type="str | None">
+  GitHub URL if found in source code comments
+</ResponseField>
+
+### _search_github_by_address(address)
+
+Search GitHub code for repositories containing the contract address.
+
+<ParamField path="address" type="str" required>
+  Contract address to search for
+</ParamField>
+
+<ResponseField name="return" type="str | None">
+  GitHub repository URL if found
+</ResponseField>
+
+### _search_github_by_name(contract_name)
+
+Search GitHub repositories by contract name.
+
+<ParamField path="contract_name" type="str" required>
+  Name of the contract to search for
+</ParamField>
+
+<ResponseField name="return" type="str | None">
+  GitHub repository URL of most starred matching repository
+</ResponseField>
+
+### _validate_github_url(url)
+
+Verify that a GitHub URL points to a valid, accessible repository.
+
+<ParamField path="url" type="str" required>
+  GitHub URL to validate
+</ParamField>
+
+<ResponseField name="return" type="bool">
+  True if repository exists and is accessible
+</ResponseField>
+
+### _extract_github_url(text)
+
+Extract and validate GitHub URLs from text (source code, comments, etc.).
+
+<ParamField path="text" type="str" required>
+  Text to search for GitHub URLs
+</ParamField>
+
+<ResponseField name="return" type="str | None">
+  First valid GitHub URL found
+</ResponseField>
+
+### _repo_has_solidity(full_name)
+
+Check if a repository contains Solidity files.
+
+<ParamField path="full_name" type="str" required>
+  Repository in "owner/repo" format
+</ParamField>
+
+<ResponseField name="return" type="bool">
+  True if repository contains .sol files
+</ResponseField>
+
+## Example Usage
+
+```python
+from github_finder import GitHubFinder
+
+# Initialize finder
+finder = GitHubFinder(
+    basescan_api_key="your_key",
+    github_token="your_token"
+)
+
+# Find repository for a contract
+contract_address = "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
+repo_url = finder.find_repo(contract_address)
+
+if repo_url:
+    print(f"Found repository: {repo_url}")
+    
+    # Get detailed info
+    info = finder.get_repo_info(repo_url)
+    print(f"Stars: {info['stars']}")
+    print(f"Description: {info['description']}")
+    
+    # Get latest commit
+    commit = finder.get_latest_commit(repo_url)
+    print(f"Latest commit: {commit['message']}")
+    print(f"By: {commit['author']} on {commit['date']}")
+else:
+    print("No repository found")
+```
+
+## Rate Limiting
+
+- **Without GitHub token:** 60 requests/hour
+- **With GitHub token:** 5,000 requests/hour
+- Built-in 200ms delay between requests to avoid rate limits
+- Automatic rate limit handling with 60-second wait
+
+## Search Patterns
+
+The finder recognizes these GitHub URL patterns in source code:
+
+```
+https://github.com/owner/repo
+http://github.com/owner/repo
+github.com/owner/repo
+```
+
+URLs are automatically cleaned:
+- `/blob/...` paths removed
+- `/tree/...` paths removed
+- Trailing slashes removed
+- `.git` extension removed
+
+## Error Handling
+
+- Network errors are logged but don't raise exceptions
+- Invalid URLs return `None` instead of errors
+- Failed validations are logged for debugging
+- GitHub API errors are caught and logged
+- Rate limit errors trigger automatic retry after delay

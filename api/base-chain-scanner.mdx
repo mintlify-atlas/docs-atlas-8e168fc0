@@ -1,0 +1,255 @@
+---
+title: "BaseChainScanner"
+description: "Blockchain scanner that detects new smart contract deployments on Base chain and retrieves contract metadata from Basescan."
+---
+
+## Overview
+
+The `BaseChainScanner` class scans the Base blockchain for new contract deployments and retrieves verified contract information from Basescan.
+
+## Class Definition
+
+```python
+from scanner import BaseChainScanner
+```
+
+## Initialization
+
+<ParamField path="rpc_url" type="str" required>
+  Base chain RPC endpoint URL
+</ParamField>
+
+<ParamField path="basescan_api_key" type="str" required>
+  API key for Basescan API access
+</ParamField>
+
+<ParamField path="min_contract_size" type="int" default="100">
+  Minimum bytecode size (in bytes) for contracts to be processed. Filters out very small contracts.
+</ParamField>
+
+```python
+scanner = BaseChainScanner(
+    rpc_url="https://mainnet.base.org",
+    basescan_api_key="your_api_key",
+    min_contract_size=100
+)
+```
+
+## Methods
+
+### get_latest_block()
+
+Retrieve the latest block number on Base chain.
+
+```python
+latest = scanner.get_latest_block()
+```
+
+<ResponseField name="return" type="int">
+  The latest block number
+</ResponseField>
+
+### get_block_timestamp(block_number)
+
+Get the timestamp for a specific block.
+
+<ParamField path="block_number" type="int" required>
+  Block number to query
+</ParamField>
+
+```python
+timestamp = scanner.get_block_timestamp(12345678)
+```
+
+<ResponseField name="return" type="datetime">
+  Block timestamp as a datetime object (UTC)
+</ResponseField>
+
+### scan_blocks(start_block, end_block)
+
+Scan a range of blocks for contract deployments.
+
+<ParamField path="start_block" type="int" required>
+  Starting block number (inclusive)
+</ParamField>
+
+<ParamField path="end_block" type="int" required>
+  Ending block number (inclusive)
+</ParamField>
+
+```python
+deployments = scanner.scan_blocks(12345000, 12345100)
+```
+
+<ResponseField name="return" type="list[ContractDeployment]">
+  List of contract deployments found in the block range. Each deployment contains:
+  - `address` - Contract address
+  - `deployer` - Deployer address
+  - `tx_hash` - Transaction hash
+  - `block_number` - Block number
+  - `timestamp` - Deployment timestamp
+  - `bytecode_size` - Size of contract bytecode
+</ResponseField>
+
+**Note:** Only contracts with bytecode size >= `min_contract_size` are returned.
+
+### scan_recent_blocks(num_blocks)
+
+Convenience method to scan the most recent blocks.
+
+<ParamField path="num_blocks" type="int" default="100">
+  Number of recent blocks to scan
+</ParamField>
+
+```python
+deployments = scanner.scan_recent_blocks(num_blocks=50)
+```
+
+<ResponseField name="return" type="list[ContractDeployment]">
+  List of contract deployments found in recent blocks
+</ResponseField>
+
+### is_contract_verified(address)
+
+Check if a contract is verified on Basescan.
+
+<ParamField path="address" type="str" required>
+  Contract address to check
+</ParamField>
+
+```python
+if scanner.is_contract_verified("0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"):
+    print("Contract is verified")
+```
+
+<ResponseField name="return" type="bool">
+  True if contract is verified, False otherwise
+</ResponseField>
+
+### get_contract_source(address)
+
+Retrieve verified contract source code from Basescan.
+
+<ParamField path="address" type="str" required>
+  Contract address to query
+</ParamField>
+
+```python
+source_info = scanner.get_contract_source("0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb")
+```
+
+<ResponseField name="return" type="dict | None">
+  Dictionary containing source code information, or None if not verified:
+  - `contract_name` - Name of the contract
+  - `source_code` - Full source code (may be multi-file JSON)
+  - `compiler_version` - Solidity compiler version
+  - `optimization_used` - Whether optimization was enabled
+  - `abi` - Contract ABI as JSON string
+  - `constructor_arguments` - Constructor arguments (hex encoded)
+  - `implementation` - Implementation address for proxy contracts
+</ResponseField>
+
+### get_contract_metadata(address)
+
+Get contract metadata including social links and GitHub URL.
+
+<ParamField path="address" type="str" required>
+  Contract address to query
+</ParamField>
+
+```python
+metadata = scanner.get_contract_metadata("0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb")
+```
+
+<ResponseField name="return" type="dict | None">
+  Dictionary containing metadata, or None if not available:
+  - `contract_name` - Name of the contract
+  - `source_code` - Full source code
+  - `github_url` - GitHub URL extracted from source (if found)
+  - `website` - Website URL (if available)
+  - `twitter` - Twitter handle (if available)
+</ResponseField>
+
+### get_deployer_info(address)
+
+Get information about a deployer address.
+
+<ParamField path="address" type="str" required>
+  Deployer address to query
+</ParamField>
+
+```python
+info = scanner.get_deployer_info("0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb")
+```
+
+<ResponseField name="return" type="dict">
+  Dictionary containing deployer information:
+  - `address` - The deployer address
+  - `balance_eth` - Current ETH balance
+  - `transaction_count` - Number of transactions sent
+</ResponseField>
+
+## ContractDeployment DataClass
+
+```python
+from scanner import ContractDeployment
+```
+
+<ParamField path="address" type="str">
+  Contract address (checksummed)
+</ParamField>
+
+<ParamField path="deployer" type="str">
+  Address that deployed the contract
+</ParamField>
+
+<ParamField path="tx_hash" type="str">
+  Transaction hash of the deployment
+</ParamField>
+
+<ParamField path="block_number" type="int">
+  Block number where contract was deployed
+</ParamField>
+
+<ParamField path="timestamp" type="datetime">
+  Timestamp of deployment (UTC)
+</ParamField>
+
+<ParamField path="bytecode_size" type="int">
+  Size of contract bytecode in bytes
+</ParamField>
+
+## Example Usage
+
+```python
+from scanner import BaseChainScanner
+
+# Initialize scanner
+scanner = BaseChainScanner(
+    rpc_url="https://mainnet.base.org",
+    basescan_api_key="YOUR_API_KEY",
+    min_contract_size=100
+)
+
+# Scan recent blocks
+deployments = scanner.scan_recent_blocks(50)
+
+for deployment in deployments:
+    print(f"Found contract: {deployment.address}")
+    print(f"  Deployer: {deployment.deployer}")
+    print(f"  Size: {deployment.bytecode_size} bytes")
+    
+    # Check if verified
+    if scanner.is_contract_verified(deployment.address):
+        metadata = scanner.get_contract_metadata(deployment.address)
+        print(f"  Name: {metadata['contract_name']}")
+        if metadata['github_url']:
+            print(f"  GitHub: {metadata['github_url']}")
+```
+
+## Error Handling
+
+- All methods include retry logic with exponential backoff
+- Network errors are automatically retried up to 3 times
+- Failed operations are logged but don't crash the scanner
+- Returns `None` for failed API requests rather than raising exceptions

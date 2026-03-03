@@ -1,0 +1,548 @@
+---
+title: Docker Deployment
+description: Complete guide to deploying Base Audit Bot with Docker and Docker Compose
+---
+
+## Overview
+
+Base Audit Bot includes production-ready Docker support with multi-stage builds, health checks, volume management, and log rotation.
+
+## Quick Start
+
+<Steps>
+  <Step title="Configure environment">
+    ```bash
+    cp .env.example .env
+    nano .env  # Add your API keys
+    ```
+  </Step>
+  
+  <Step title="Deploy with Docker Compose">
+    ```bash
+    docker-compose up -d
+    ```
+  </Step>
+  
+  <Step title="Verify deployment">
+    ```bash
+    docker-compose logs -f
+    curl http://localhost:5000/health
+    ```
+  </Step>
+</Steps>
+
+## Dockerfile
+
+The bot's `Dockerfile` is optimized for production use:
+
+```dockerfile
+FROM python:3.11-slim
+
+# Set working directory
+WORKDIR /app
+
+# Install git (required for cloning repos)
+RUN apt-get update && apt-get install -y \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first for better caching
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY *.py ./
+
+# Create directories for data and logs
+RUN mkdir -p /app/data /app/logs /app/temp_repos
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV DATABASE_PATH=/app/data/bot.db
+ENV TEMP_DIR=/app/temp_repos
+
+# Expose webhook port
+EXPOSE 5000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:5000/health || exit 1
+
+# Run the bot
+CMD ["python", "bot.py"]
+```
+
+<AccordionGroup>
+  <Accordion title="Dockerfile Features">
+    - **Base image**: Python 3.11 slim for smaller size
+    - **Git included**: Required for cloning GitHub repositories
+    - **Layer caching**: Dependencies installed before code for faster rebuilds
+    - **Health checks**: Automatic container health monitoring
+    - **Unbuffered output**: `PYTHONUNBUFFERED=1` for real-time logs
+    - **Directory structure**: Pre-created directories for data, logs, and temp files
+  </Accordion>
+</AccordionGroup>
+
+## Docker Compose
+
+The `docker-compose.yml` provides a complete production setup:
+
+```yaml
+version: '3.8'
+
+services:
+  audit-bot:
+    build: .
+    container_name: base-audit-bot
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      # Persist database and logs
+      - ./data:/app/data
+      - ./logs:/app/logs
+      # Temporary repos (can be ephemeral)
+      - bot-temp:/app/temp_repos
+    environment:
+      # Base Chain
+      - BASE_RPC_URL=${BASE_RPC_URL:-https://mainnet.base.org}
+      - BASESCAN_API_KEY=${BASESCAN_API_KEY}
+      # Anthropic
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      # Twitter
+      - TWITTER_API_KEY=${TWITTER_API_KEY}
+      - TWITTER_API_SECRET=${TWITTER_API_SECRET}
+      - TWITTER_ACCESS_TOKEN=${TWITTER_ACCESS_TOKEN}
+      - TWITTER_ACCESS_SECRET=${TWITTER_ACCESS_SECRET}
+      - TWITTER_BEARER_TOKEN=${TWITTER_BEARER_TOKEN}
+      # Webhook
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET}
+      - WEBHOOK_PORT=5000
+      # Bot settings
+      - SCAN_INTERVAL_MINUTES=${SCAN_INTERVAL_MINUTES:-15}
+      - BLOCKS_TO_SCAN=${BLOCKS_TO_SCAN:-100}
+      - MIN_CONTRACT_SIZE=${MIN_CONTRACT_SIZE:-100}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  bot-temp:
+    driver: local
+```
+
+## Volume Management
+
+<AccordionGroup>
+  <Accordion title="Data Volume (./data:/app/data)">
+    **Purpose**: Persistent SQLite database storage
+    
+    **Contains**:
+    - `bot.db` - SQLite database with contracts, audits, tweets, and monitored repos
+    
+    **Backup**: Regular backups recommended
+    ```bash
+    cp data/bot.db data/bot.db.backup
+    ```
+  </Accordion>
+  
+  <Accordion title="Logs Volume (./logs:/app/logs)">
+    **Purpose**: Persistent application logs
+    
+    **Contains**:
+    - `bot.log` - Application logs with rotation
+    
+    **Rotation**: Handled by Docker logging driver (10MB, 3 files)
+  </Accordion>
+  
+  <Accordion title="Temp Repos Volume (bot-temp:/app/temp_repos)">
+    **Purpose**: Temporary GitHub repository clones
+    
+    **Type**: Named Docker volume (ephemeral)
+    
+    **Cleanup**: Automatically cleaned by bot, can be manually cleared:
+    ```bash
+    docker-compose down
+    docker volume rm base-audit-bot_bot-temp
+    docker-compose up -d
+    ```
+  </Accordion>
+</AccordionGroup>
+
+<Warning>
+  **Data persistence**: The `data` and `logs` volumes are bind mounts to the host filesystem. Ensure these directories exist and have proper permissions before starting.
+</Warning>
+
+## Container Management
+
+### Starting and Stopping
+
+```bash
+# Start in background
+docker-compose up -d
+
+# Start with logs visible
+docker-compose up
+
+# Stop containers
+docker-compose down
+
+# Stop and remove volumes
+docker-compose down -v
+
+# Restart
+docker-compose restart
+
+# Restart specific service
+docker-compose restart audit-bot
+```
+
+### Viewing Logs
+
+```bash
+# Follow all logs
+docker-compose logs -f
+
+# Follow specific service
+docker-compose logs -f audit-bot
+
+# View last 100 lines
+docker-compose logs --tail=100
+
+# View logs with timestamps
+docker-compose logs -t
+```
+
+### Executing Commands
+
+```bash
+# Open shell in container
+docker-compose exec audit-bot /bin/bash
+
+# Run Python shell
+docker-compose exec audit-bot python
+
+# Check database
+docker-compose exec audit-bot sqlite3 /app/data/bot.db "SELECT COUNT(*) FROM contracts"
+
+# View environment variables
+docker-compose exec audit-bot env
+```
+
+## Health Checks
+
+The container includes built-in health monitoring via `Dockerfile:32`:
+
+```dockerfile
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:5000/health || exit 1
+```
+
+### Health Check Configuration
+
+- **Interval**: Check every 30 seconds
+- **Timeout**: 10 seconds per check
+- **Start period**: Wait 5 seconds after container start
+- **Retries**: Mark unhealthy after 3 consecutive failures
+
+### Checking Health Status
+
+```bash
+# Check health status
+docker-compose ps
+
+# Detailed health information
+docker inspect --format='{{json .State.Health}}' base-audit-bot | jq
+
+# Manual health check
+curl http://localhost:5000/health
+```
+
+<Tip>
+  Expected health response:
+  ```json
+  {
+    "status": "healthy",
+    "timestamp": "2026-03-03T12:00:00.000000"
+  }
+  ```
+</Tip>
+
+## Log Rotation
+
+Docker Compose is configured with automatic log rotation via `docker-compose.yml:44`:
+
+```yaml
+logging:
+  driver: "json-file"
+  options:
+    max-size: "10m"    # Rotate when file reaches 10MB
+    max-file: "3"      # Keep 3 rotated files
+```
+
+This configuration:
+- Limits each log file to 10MB
+- Keeps up to 3 files (30MB total)
+- Automatically rotates when size limit is reached
+
+## Building Custom Images
+
+### Build from Source
+
+```bash
+# Build with default tag
+docker build -t base-audit-bot .
+
+# Build with custom tag
+docker build -t base-audit-bot:v1.0.0 .
+
+# Build with no cache
+docker build --no-cache -t base-audit-bot .
+```
+
+### Multi-Platform Builds
+
+```bash
+# Build for multiple architectures
+docker buildx build --platform linux/amd64,linux/arm64 -t base-audit-bot:latest .
+```
+
+## Environment Variables
+
+Docker Compose supports environment variables in two ways:
+
+<AccordionGroup>
+  <Accordion title="Method 1: .env file (Recommended)">
+    ```yaml
+    env_file:
+      - .env
+    ```
+    
+    All variables from `.env` are automatically loaded.
+  </Accordion>
+  
+  <Accordion title="Method 2: Direct environment section">
+    ```yaml
+    environment:
+      - BASE_RPC_URL=${BASE_RPC_URL:-https://mainnet.base.org}
+      - BASESCAN_API_KEY=${BASESCAN_API_KEY}
+    ```
+    
+    Supports default values with `${VAR:-default}` syntax.
+  </Accordion>
+</AccordionGroup>
+
+<Note>
+  The bot uses **both methods**: the `environment` section provides defaults and documentation, while `env_file` loads all variables from `.env`.
+</Note>
+
+## Production Deployment
+
+### Prerequisites Checklist
+
+<Steps>
+  <Step title="Install Docker and Docker Compose">
+    ```bash
+    # Verify installation
+    docker --version    # Should be 20.10+
+    docker-compose --version  # Should be 2.0+
+    ```
+  </Step>
+  
+  <Step title="Configure environment">
+    - Copy `.env.example` to `.env`
+    - Fill in all required API keys
+    - Set production log level (INFO or WARNING)
+    - Configure webhook secret
+  </Step>
+  
+  <Step title="Create directories">
+    ```bash
+    mkdir -p data logs
+    chmod 755 data logs
+    ```
+  </Step>
+  
+  <Step title="Test configuration">
+    ```bash
+    docker-compose config
+    ```
+  </Step>
+</Steps>
+
+### Deployment
+
+```bash
+# Build and start
+docker-compose up -d
+
+# Wait for health check
+sleep 10
+
+# Verify deployment
+docker-compose ps
+curl http://localhost:5000/health
+
+# Monitor logs for errors
+docker-compose logs --tail=50 -f
+```
+
+## Updating the Container
+
+<Steps>
+  <Step title="Pull latest code">
+    ```bash
+    git pull origin main
+    ```
+  </Step>
+  
+  <Step title="Rebuild image">
+    ```bash
+    docker-compose build
+    ```
+  </Step>
+  
+  <Step title="Restart with new image">
+    ```bash
+    docker-compose down
+    docker-compose up -d
+    ```
+    
+    <Note>
+      Data and logs are preserved in volumes.
+    </Note>
+  </Step>
+  
+  <Step title="Verify update">
+    ```bash
+    docker-compose logs --tail=20
+    curl http://localhost:5000/health
+    ```
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Container exits immediately">
+    **Check logs**:
+    ```bash
+    docker-compose logs
+    ```
+    
+    **Common causes**:
+    - Missing required environment variables
+    - Invalid configuration values
+    - Permission issues with volumes
+  </Accordion>
+  
+  <Accordion title="Health check failing">
+    **Verify webhook server is running**:
+    ```bash
+    docker-compose exec audit-bot curl http://localhost:5000/health
+    ```
+    
+    **Check if port is bound**:
+    ```bash
+    docker-compose exec audit-bot netstat -tuln | grep 5000
+    ```
+  </Accordion>
+  
+  <Accordion title="Cannot access webhook endpoint">
+    **Check port mapping**:
+    ```bash
+    docker-compose ps
+    netstat -tuln | grep 5000
+    ```
+    
+    **Verify firewall**:
+    ```bash
+    sudo ufw status
+    ```
+  </Accordion>
+  
+  <Accordion title="High disk usage">
+    **Check log size**:
+    ```bash
+    docker-compose logs --tail=1 | wc -c
+    ```
+    
+    **Clear old logs**:
+    ```bash
+    docker-compose down
+    rm -f logs/*
+    docker-compose up -d
+    ```
+    
+    **Check temp repos**:
+    ```bash
+    docker-compose exec audit-bot du -sh /app/temp_repos
+    ```
+  </Accordion>
+</AccordionGroup>
+
+<Tip>
+  For more troubleshooting guidance, see the [Troubleshooting Guide](/guides/troubleshooting).
+</Tip>
+
+## Advanced Configuration
+
+### Custom Docker Network
+
+```yaml
+services:
+  audit-bot:
+    networks:
+      - bot-network
+
+networks:
+  bot-network:
+    driver: bridge
+```
+
+### Resource Limits
+
+```yaml
+services:
+  audit-bot:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+```
+
+### Multiple Instances
+
+Run multiple instances with different configurations:
+
+```yaml
+services:
+  audit-bot-1:
+    build: .
+    env_file: .env.bot1
+    ports:
+      - "5001:5000"
+    
+  audit-bot-2:
+    build: .
+    env_file: .env.bot2
+    ports:
+      - "5002:5000"
+```

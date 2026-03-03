@@ -1,0 +1,512 @@
+---
+title: AI-Powered Auditing with Claude
+description: How Base Audit Bot uses Anthropic's Claude to perform intelligent security audits of Solidity smart contracts
+---
+
+## Overview
+
+The `SolidityAuditor` class leverages Anthropic's Claude AI model to perform comprehensive security audits of Solidity smart contracts. It analyzes source code for common vulnerabilities, provides severity ratings, and generates actionable recommendations.
+
+## Architecture
+
+### Model Selection
+
+The bot uses **Claude Sonnet 4** (`claude-sonnet-4-20250514`) for optimal balance of:
+- **Accuracy**: Deep understanding of Solidity security patterns
+- **Speed**: 2-5 second response time per file
+- **Cost-effectiveness**: Reasonable pricing for continuous monitoring
+
+```python
+class SolidityAuditor:
+    def __init__(self, anthropic_api_key: str, temp_dir: Optional[Path] = None):
+        self.client = anthropic.Anthropic(api_key=anthropic_api_key)
+        self.temp_dir = temp_dir or Path(tempfile.gettempdir()) / "audit_repos"
+        self.max_file_size = 100000  # 100KB max per file
+        self.max_retries = 2
+```
+
+## Audit Prompt Engineering
+
+### Security-Focused System Prompt
+
+The bot uses a carefully crafted prompt that focuses Claude on smart contract security:
+
+```python
+AUDIT_PROMPT = """You are an expert smart contract security auditor. Analyze the following Solidity code for security vulnerabilities.
+
+Focus on these vulnerability categories:
+1. **Reentrancy attacks** - State changes after external calls, cross-function reentrancy
+2. **Access control issues** - Missing modifiers, improper role management, unprotected functions
+3. **Integer overflow/underflow** - Unchecked arithmetic (especially in older Solidity versions)
+4. **Unchecked external calls** - Missing return value checks, call/delegatecall issues
+5. **Centralization risks** - Single owner control, upgrade mechanisms, emergency functions
+6. **Gas optimization issues** - Unbounded loops, expensive storage operations
+7. **Logic errors** - Incorrect state transitions, race conditions
+8. **Front-running vulnerabilities** - Price manipulation, sandwich attacks
+9. **Denial of Service** - Block gas limit, failed transfers blocking execution
+10. **Oracle manipulation** - Price oracle issues, flash loan attacks
+
+For each vulnerability found, provide:
+- Severity (Critical/High/Medium/Low)
+- Title (brief description)
+- Description (detailed explanation)
+- Location (function or line reference if possible)
+- Recommendation (how to fix)
+
+Respond in JSON format:
+{
+    "findings": [
+        {
+            "severity": "Critical|High|Medium|Low",
+            "title": "Brief title",
+            "description": "Detailed description",
+            "location": "function name or line reference",
+            "recommendation": "How to fix"
+        }
+    ],
+    "summary": "Brief overall assessment of the contract's security"
+}
+
+If no vulnerabilities are found, return an empty findings array with a positive summary.
+
+Here is the Solidity code to audit:
+
+```solidity
+{code}
+```"""
+```
+
+<Info>
+The structured JSON output ensures consistent parsing and enables programmatic processing of audit results.
+</Info>
+
+## Audit Workflow
+
+### Repository-Based Audits
+
+For contracts with associated GitHub repositories:
+
+```python
+def audit_repo(self, repo_url: str) -> FullAuditReport:
+    """Perform a full audit of a GitHub repository."""
+    report = FullAuditReport(
+        repo_url=repo_url,
+        audit_date=datetime.utcnow(),
+        files_audited=0,
+        total_findings=0,
+        critical_count=0,
+        high_count=0,
+        medium_count=0,
+        low_count=0
+    )
+    
+    clone_path = None
+    
+    try:
+        # Clone repository (shallow clone)
+        clone_path = self.clone_repo(repo_url)
+        
+        # Find Solidity files
+        sol_files = self.find_solidity_files(clone_path)
+        
+        if not sol_files:
+            report.error = "No Solidity files found"
+            return report
+        
+        # Audit each file
+        for sol_file in sol_files:
+            result = self.audit_file(sol_file)
+            
+            if result.findings:
+                report.files_audited += 1
+                for finding in result.findings:
+                    # Add file context to location
+                    finding.location = f"{sol_file.name}: {finding.location}"
+                    report.findings.append(finding)
+        
+        # Count findings by severity
+        for finding in report.findings:
+            severity = finding.severity.lower()
+            if severity == "critical":
+                report.critical_count += 1
+            elif severity == "high":
+                report.high_count += 1
+            elif severity == "medium":
+                report.medium_count += 1
+            elif severity == "low":
+                report.low_count += 1
+        
+        report.total_findings = len(report.findings)
+        report.summary = self._generate_summary(report)
+    
+    finally:
+        # Cleanup cloned repo
+        if clone_path and clone_path.exists():
+            self.cleanup(clone_path)
+    
+    return report
+```
+
+### Finding Solidity Files
+
+The auditor searches common directories and filters out test files:
+
+```python
+def find_solidity_files(self, repo_path: Path) -> list[Path]:
+    """Find all Solidity files in a repository."""
+    # Common directories to search
+    search_dirs = [
+        repo_path / "contracts",
+        repo_path / "src",
+        repo_path / "lib",
+        repo_path,
+    ]
+    
+    sol_files = []
+    for search_dir in search_dirs:
+        if search_dir.exists():
+            sol_files.extend(search_dir.rglob("*.sol"))
+    
+    # Remove duplicates and sort
+    sol_files = sorted(set(sol_files))
+    
+    # Filter out test files and mocks
+    filtered_files = [
+        f for f in sol_files
+        if not any(x in str(f).lower() for x in ["test", "mock", "script", "node_modules"])
+    ]
+    
+    return filtered_files
+```
+
+<Warning>
+The bot skips:
+- Test files (containing "test" in path)
+- Mock contracts (containing "mock" in path)
+- Scripts (containing "script" in path)
+- Dependencies (node_modules, lib)
+
+This focuses audits on production contract code.
+</Warning>
+
+### Single File Audits
+
+The core auditing logic analyzes individual Solidity files:
+
+```python
+def audit_file(self, file_path: Path) -> AuditResult:
+    """Audit a single Solidity file using Claude."""
+    result = AuditResult(file_path=str(file_path))
+    
+    try:
+        # Read file content
+        content = file_path.read_text(encoding="utf-8", errors="ignore")
+        
+        # Skip if file is too large
+        if len(content) > self.max_file_size:
+            result.error = "File too large to audit"
+            return result
+        
+        # Skip if file is mostly imports or interfaces
+        if self._is_minimal_contract(content):
+            return result
+        
+        # Call Claude API
+        response = self._call_claude(content)
+        
+        if response:
+            result.findings = [
+                Finding(
+                    severity=f.get("severity", "Medium"),
+                    title=f.get("title", "Unknown"),
+                    description=f.get("description", ""),
+                    location=f.get("location"),
+                    recommendation=f.get("recommendation")
+                )
+                for f in response.get("findings", []) if isinstance(f, dict)
+            ]
+    
+    except Exception as e:
+        result.error = str(e)
+    
+    return result
+```
+
+### Filtering Minimal Contracts
+
+To avoid wasting API calls, the auditor skips interface-only files:
+
+```python
+def _is_minimal_contract(self, content: str) -> bool:
+    """Check if a file is mostly imports or interfaces."""
+    lines = content.split("\n")
+    code_lines = [
+        l for l in lines
+        if l.strip() and not l.strip().startswith("//") and not l.strip().startswith("import")
+    ]
+    
+    # If less than 10 lines of actual code, skip
+    if len(code_lines) < 10:
+        return True
+    
+    # If file is an interface (all functions are external/public with no body)
+    if "interface " in content and "function " in content:
+        func_count = content.count("function ")
+        empty_funcs = content.count(");")
+        if empty_funcs >= func_count * 0.8:  # 80% or more are interface functions
+            return True
+    
+    return False
+```
+
+## Claude API Integration
+
+### Making API Calls
+
+```python
+def _call_claude(self, code: str) -> Optional[dict]:
+    """Call Claude API for code analysis."""
+    for attempt in range(self.max_retries + 1):
+        try:
+            message = self.client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=4096,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": self.AUDIT_PROMPT.format(code=code)
+                    }
+                ]
+            )
+            
+            # Parse response
+            response_text = message.content[0].text
+            
+            # Extract JSON from response
+            json_start = response_text.find("{")
+            json_end = response_text.rfind("}") + 1
+            
+            if json_start >= 0 and json_end > json_start:
+                json_str = response_text[json_start:json_end]
+                return json.loads(json_str)
+            
+            return None
+        
+        except anthropic.RateLimitError:
+            if attempt < self.max_retries:
+                logger.warning("Rate limited, waiting before retry...")
+                time.sleep(60)  # Wait 60 seconds
+                continue
+            raise
+        
+        except Exception as e:
+            logger.error(f"Claude API error: {e}")
+            if attempt < self.max_retries:
+                continue
+            return None
+    
+    return None
+```
+
+### Rate Limit Handling
+
+<Tip>
+**Rate limit strategy:**
+- Automatic retry with 60-second delay on rate limit errors
+- Max 2 retries per file to avoid excessive delays
+- Failed audits are logged but don't block other files
+</Tip>
+
+## Data Structures
+
+### Finding Object
+
+```python
+@dataclass
+class Finding:
+    """Represents a single security finding."""
+    severity: str  # Critical, High, Medium, Low
+    title: str
+    description: str
+    location: Optional[str] = None
+    recommendation: Optional[str] = None
+```
+
+### FullAuditReport Object
+
+```python
+@dataclass
+class FullAuditReport:
+    """Complete audit report for a repository."""
+    repo_url: str
+    audit_date: datetime
+    files_audited: int
+    total_findings: int
+    critical_count: int
+    high_count: int
+    medium_count: int
+    low_count: int
+    findings: list[Finding] = field(default_factory=list)
+    summary: str = ""
+    error: Optional[str] = None
+```
+
+## Direct Source Code Audits
+
+For verified contracts without GitHub repositories:
+
+```python
+def audit_source_code(self, source_code: str, contract_name: str = "Unknown") -> FullAuditReport:
+    """Audit source code directly without cloning a repo."""
+    report = FullAuditReport(
+        repo_url="direct_source",
+        audit_date=datetime.utcnow(),
+        files_audited=1,
+        total_findings=0,
+        critical_count=0,
+        high_count=0,
+        medium_count=0,
+        low_count=0
+    )
+    
+    try:
+        # Handle multi-file JSON format from Basescan
+        if source_code.startswith("{{"):
+            source_code = source_code[1:-1]
+            sources = json.loads(source_code)
+            if "sources" in sources:
+                all_code = []
+                for file_info in sources["sources"].values():
+                    all_code.append(file_info.get("content", ""))
+                source_code = "\n\n".join(all_code)
+        
+        # Audit the source code
+        response = self._call_claude(source_code)
+        
+        if response:
+            findings = response.get("findings", [])
+            
+            for finding_data in findings:
+                if isinstance(finding_data, dict):
+                    finding = Finding(
+                        severity=finding_data.get("severity", "Medium"),
+                        title=finding_data.get("title", "Unknown"),
+                        description=finding_data.get("description", ""),
+                        location=finding_data.get("location", contract_name),
+                        recommendation=finding_data.get("recommendation")
+                    )
+                    report.findings.append(finding)
+            
+            # Count by severity
+            for finding in report.findings:
+                severity = finding.severity.lower()
+                if severity == "critical":
+                    report.critical_count += 1
+                elif severity == "high":
+                    report.high_count += 1
+                elif severity == "medium":
+                    report.medium_count += 1
+                elif severity == "low":
+                    report.low_count += 1
+            
+            report.total_findings = len(report.findings)
+            report.summary = response.get("summary", self._generate_summary(report))
+    
+    except Exception as e:
+        report.error = str(e)
+        report.summary = f"Audit failed: {str(e)}"
+    
+    return report
+```
+
+## Summary Generation
+
+Human-readable summaries are generated from audit results:
+
+```python
+def _generate_summary(self, report: FullAuditReport) -> str:
+    """Generate a human-readable summary of the audit."""
+    if report.total_findings == 0:
+        return "No security issues detected. The contracts appear to follow security best practices."
+    
+    severity_parts = []
+    if report.critical_count > 0:
+        severity_parts.append(f"{report.critical_count} critical")
+    if report.high_count > 0:
+        severity_parts.append(f"{report.high_count} high")
+    if report.medium_count > 0:
+        severity_parts.append(f"{report.medium_count} medium")
+    if report.low_count > 0:
+        severity_parts.append(f"{report.low_count} low")
+    
+    summary = f"Found {report.total_findings} issue(s): {', '.join(severity_parts)}."
+    
+    if report.critical_count > 0:
+        summary += " Immediate attention required for critical issues."
+    elif report.high_count > 0:
+        summary += " High severity issues should be addressed before deployment."
+    
+    return summary
+```
+
+## Integration with Main Bot
+
+The auditor is called after contract discovery:
+
+```python
+# Initialize auditor
+self.auditor = SolidityAuditor(
+    anthropic_api_key=config.anthropic_api_key,
+    temp_dir=config.temp_dir
+)
+
+# Perform audit
+if repo_url:
+    report = self.auditor.audit_repo(repo_url)
+else:
+    report = self.auditor.audit_source_code(source_code, contract_name)
+
+# Save and post results
+if not report.error:
+    audit = Audit(
+        contract_id=contract.id,
+        audit_date=datetime.utcnow(),
+        critical_count=report.critical_count,
+        high_count=report.high_count,
+        medium_count=report.medium_count,
+        low_count=report.low_count,
+        summary=report.summary
+    )
+    self.db.add_audit(audit)
+    self.twitter_bot.post_audit(contract, audit)
+```
+
+## Performance Characteristics
+
+### Latency
+
+- **Single file**: 2-5 seconds (Claude API latency)
+- **Small repo (5-10 files)**: 10-50 seconds
+- **Large repo (20+ files)**: 1-2 minutes
+
+### Cost Optimization
+
+<Info>
+**Cost reduction strategies:**
+1. Skip interface-only files
+2. Filter test and mock contracts
+3. Limit file size to 100KB
+4. Use shallow git clones
+5. Clean up temp directories after audits
+</Info>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Twitter Integration" icon="twitter" href="/concepts/twitter-integration">
+    Learn how audit results are posted to Twitter
+  </Card>
+  <Card title="System Architecture" icon="diagram-project" href="/concepts/architecture">
+    Understand how all components work together
+  </Card>
+</CardGroup>

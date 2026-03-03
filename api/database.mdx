@@ -1,0 +1,506 @@
+---
+title: "Database"
+description: "SQLite database manager for storing contracts, audits, tweets, and monitoring data."
+---
+
+## Overview
+
+The `Database` class manages all persistent storage for the Base Audit Bot using SQLite. It provides methods for storing and retrieving contracts, audit results, tweets, monitored repositories, and blocklist entries.
+
+## Class Definition
+
+```python
+from models import Database
+```
+
+## Initialization
+
+<ParamField path="db_path" type="Path" required>
+  Path to SQLite database file. Parent directories are created automatically.
+</ParamField>
+
+```python
+from pathlib import Path
+from models import Database
+
+db = Database(Path("./data/audit_bot.db"))
+```
+
+## Contract Operations
+
+### add_contract(contract)
+
+Add a new contract to the database.
+
+<ParamField path="contract" type="Contract" required>
+  Contract object to insert. The `id` field is ignored and auto-generated.
+</ParamField>
+
+```python
+from models import Contract
+from datetime import datetime
+
+contract = Contract(
+    id=None,
+    address="0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+    deployer="0xdeployer...",
+    deploy_time=datetime.utcnow(),
+    tx_hash="0xtxhash...",
+    repo_url="https://github.com/owner/repo",
+    last_audit=None,
+    contract_name="MyToken",
+    is_verified=True
+)
+
+contract_id = db.add_contract(contract)
+```
+
+<ResponseField name="return" type="int">
+  Database ID of the inserted contract
+</ResponseField>
+
+### get_contract_by_address(address)
+
+Retrieve a contract by its address.
+
+<ParamField path="address" type="str" required>
+  Contract address (case-insensitive)
+</ParamField>
+
+```python
+contract = db.get_contract_by_address("0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb")
+```
+
+<ResponseField name="return" type="Contract | None">
+  Contract object if found, None otherwise
+</ResponseField>
+
+### update_contract_repo(address, repo_url)
+
+Update a contract's repository URL.
+
+<ParamField path="address" type="str" required>
+  Contract address
+</ParamField>
+
+<ParamField path="repo_url" type="str" required>
+  GitHub repository URL
+</ParamField>
+
+```python
+db.update_contract_repo(
+    "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+    "https://github.com/owner/repo"
+)
+```
+
+### update_contract_audit_time(address)
+
+Update a contract's last audit timestamp to current time.
+
+<ParamField path="address" type="str" required>
+  Contract address
+</ParamField>
+
+```python
+db.update_contract_audit_time("0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb")
+```
+
+### get_unaudited_contracts(limit)
+
+Get contracts that haven't been audited yet but have a repository URL.
+
+<ParamField path="limit" type="int" default="50">
+  Maximum number of contracts to return
+</ParamField>
+
+```python
+contracts = db.get_unaudited_contracts(limit=20)
+```
+
+<ResponseField name="return" type="list[Contract]">
+  List of unaudited contracts, ordered by deployment time (newest first)
+</ResponseField>
+
+### get_contracts_scanned_today()
+
+Get count of contracts added to database today.
+
+```python
+count = db.get_contracts_scanned_today()
+```
+
+<ResponseField name="return" type="int">
+  Number of contracts scanned today
+</ResponseField>
+
+## Audit Operations
+
+### add_audit(audit)
+
+Add a new audit result to the database.
+
+<ParamField path="audit" type="Audit" required>
+  Audit object to insert. The `id` field is ignored and auto-generated.
+</ParamField>
+
+```python
+from models import Audit
+from datetime import datetime
+
+audit = Audit(
+    id=None,
+    contract_id=1,
+    audit_date=datetime.utcnow(),
+    critical_count=2,
+    high_count=3,
+    medium_count=5,
+    low_count=1,
+    summary="Found critical reentrancy issues",
+    full_report=None
+)
+
+audit_id = db.add_audit(audit)
+```
+
+<ResponseField name="return" type="int">
+  Database ID of the inserted audit
+</ResponseField>
+
+### get_audit_by_contract_id(contract_id)
+
+Get the most recent audit for a contract.
+
+<ParamField path="contract_id" type="int" required>
+  Database ID of the contract
+</ParamField>
+
+```python
+audit = db.get_audit_by_contract_id(1)
+```
+
+<ResponseField name="return" type="Audit | None">
+  Most recent Audit object for the contract, or None if no audits exist
+</ResponseField>
+
+### get_daily_stats()
+
+Get audit statistics for today.
+
+```python
+stats = db.get_daily_stats()
+```
+
+<ResponseField name="return" type="dict">
+  Dictionary containing:
+  - `total_audits` - Number of audits performed today
+  - `total_critical` - Sum of critical issues found
+  - `total_high` - Sum of high severity issues
+  - `total_medium` - Sum of medium severity issues
+  - `total_low` - Sum of low severity issues
+</ResponseField>
+
+## Tweet Operations
+
+### add_tweet(tweet)
+
+Record a posted tweet in the database.
+
+<ParamField path="tweet" type="Tweet" required>
+  Tweet object to insert. The `id` field is ignored and auto-generated.
+</ParamField>
+
+```python
+from models import Tweet
+from datetime import datetime
+
+tweet = Tweet(
+    id=None,
+    audit_id=1,
+    tweet_id="1234567890",
+    posted_at=datetime.utcnow(),
+    tweet_type="audit",
+    content="🔍 New audit: MyToken..."
+)
+
+tweet_id = db.add_tweet(tweet)
+```
+
+<ResponseField name="return" type="int">
+  Database ID of the inserted tweet record
+</ResponseField>
+
+## Monitored Repository Operations
+
+### add_monitored_repo(repo_url, contract_id)
+
+Add a repository to monitor for updates.
+
+<ParamField path="repo_url" type="str" required>
+  GitHub repository URL
+</ParamField>
+
+<ParamField path="contract_id" type="int" optional>
+  Associated contract ID (can be None)
+</ParamField>
+
+```python
+db.add_monitored_repo(
+    "https://github.com/owner/repo",
+    contract_id=1
+)
+```
+
+### get_monitored_repos()
+
+Get all monitored repositories.
+
+```python
+repos = db.get_monitored_repos()
+```
+
+<ResponseField name="return" type="list[dict]">
+  List of repository records, each containing:
+  - `id` - Database ID
+  - `repo_url` - Repository URL
+  - `contract_id` - Associated contract ID
+  - `last_commit_sha` - Last known commit SHA
+  - `added_at` - When repo was added to monitoring
+</ResponseField>
+
+### update_repo_commit(repo_url, commit_sha)
+
+Update the last known commit for a monitored repository.
+
+<ParamField path="repo_url" type="str" required>
+  Repository URL
+</ParamField>
+
+<ParamField path="commit_sha" type="str" required>
+  Latest commit SHA
+</ParamField>
+
+```python
+db.update_repo_commit(
+    "https://github.com/owner/repo",
+    "abc123def456..."
+)
+```
+
+## Blocklist Operations
+
+### is_blocklisted(address)
+
+Check if an address is blocklisted.
+
+<ParamField path="address" type="str" required>
+  Address to check (case-insensitive)
+</ParamField>
+
+```python
+if db.is_blocklisted("0xspammer..."):
+    print("Address is blocklisted")
+```
+
+<ResponseField name="return" type="bool">
+  True if address is blocklisted, False otherwise
+</ResponseField>
+
+### add_to_blocklist(address, reason)
+
+Add an address to the blocklist.
+
+<ParamField path="address" type="str" required>
+  Address to blocklist
+</ParamField>
+
+<ParamField path="reason" type="str" default="">
+  Reason for blocklisting
+</ParamField>
+
+```python
+db.add_to_blocklist(
+    "0xspammer...",
+    reason="Known scam contract"
+)
+```
+
+## Data Models
+
+### Contract
+
+```python
+from models import Contract
+```
+
+<ParamField path="id" type="int | None">
+  Database ID (None for new records)
+</ParamField>
+
+<ParamField path="address" type="str">
+  Contract address (checksummed)
+</ParamField>
+
+<ParamField path="deployer" type="str">
+  Deployer address
+</ParamField>
+
+<ParamField path="deploy_time" type="datetime">
+  When contract was deployed
+</ParamField>
+
+<ParamField path="tx_hash" type="str">
+  Deployment transaction hash
+</ParamField>
+
+<ParamField path="repo_url" type="str | None">
+  GitHub repository URL
+</ParamField>
+
+<ParamField path="last_audit" type="datetime | None">
+  When contract was last audited
+</ParamField>
+
+<ParamField path="contract_name" type="str | None">
+  Name of the contract
+</ParamField>
+
+<ParamField path="is_verified" type="bool">
+  Whether contract is verified on Basescan
+</ParamField>
+
+### Audit
+
+```python
+from models import Audit
+```
+
+<ParamField path="id" type="int | None">
+  Database ID
+</ParamField>
+
+<ParamField path="contract_id" type="int">
+  Associated contract ID
+</ParamField>
+
+<ParamField path="audit_date" type="datetime">
+  When audit was performed
+</ParamField>
+
+<ParamField path="critical_count" type="int">
+  Number of critical issues
+</ParamField>
+
+<ParamField path="high_count" type="int">
+  Number of high severity issues
+</ParamField>
+
+<ParamField path="medium_count" type="int">
+  Number of medium severity issues
+</ParamField>
+
+<ParamField path="low_count" type="int">
+  Number of low severity issues
+</ParamField>
+
+<ParamField path="summary" type="str">
+  Human-readable audit summary
+</ParamField>
+
+<ParamField path="full_report" type="str | None">
+  Full audit report (JSON or text)
+</ParamField>
+
+### Tweet
+
+```python
+from models import Tweet
+```
+
+<ParamField path="id" type="int | None">
+  Database ID
+</ParamField>
+
+<ParamField path="audit_id" type="int | None">
+  Associated audit ID (None for non-audit tweets)
+</ParamField>
+
+<ParamField path="tweet_id" type="str">
+  Twitter tweet ID
+</ParamField>
+
+<ParamField path="posted_at" type="datetime">
+  When tweet was posted
+</ParamField>
+
+<ParamField path="tweet_type" type="str">
+  Type of tweet: "audit", "update", or "summary"
+</ParamField>
+
+<ParamField path="content" type="str">
+  Tweet text content
+</ParamField>
+
+## Database Schema
+
+The database includes these tables:
+
+- **contracts** - Deployed contracts
+- **audits** - Audit results
+- **tweets** - Posted tweets
+- **monitored_repos** - Repositories being monitored
+- **blocklist** - Blocklisted addresses
+
+Indexes are automatically created on:
+- `contracts.address`
+- `contracts.deployer`
+- `audits.contract_id`
+- `tweets.audit_id`
+
+## Example Usage
+
+```python
+from pathlib import Path
+from models import Database, Contract, Audit
+from datetime import datetime
+
+# Initialize database
+db = Database(Path("./audit_bot.db"))
+
+# Add a contract
+contract = Contract(
+    id=None,
+    address="0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+    deployer="0xdeployer...",
+    deploy_time=datetime.utcnow(),
+    tx_hash="0xtx...",
+    repo_url="https://github.com/owner/repo",
+    last_audit=None,
+    contract_name="MyToken",
+    is_verified=True
+)
+
+contract_id = db.add_contract(contract)
+
+# Add an audit
+audit = Audit(
+    id=None,
+    contract_id=contract_id,
+    audit_date=datetime.utcnow(),
+    critical_count=1,
+    high_count=2,
+    medium_count=3,
+    low_count=0,
+    summary="Found reentrancy vulnerability"
+)
+
+audit_id = db.add_audit(audit)
+
+# Update contract audit time
+db.update_contract_audit_time(contract.address)
+
+# Get daily stats
+stats = db.get_daily_stats()
+print(f"Audits today: {stats['total_audits']}")
+print(f"Critical issues: {stats['total_critical']}")
+```

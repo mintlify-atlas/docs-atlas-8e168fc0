@@ -1,0 +1,557 @@
+---
+title: "Installation"
+description: "Complete installation guide for Base Audit Bot with Python virtualenv and Docker"
+---
+
+# Installation
+
+This guide covers everything you need to install and configure Base Audit Bot, including prerequisites, API key generation, and deployment options.
+
+## Prerequisites
+
+Before installing, ensure you have:
+
+### Required Software
+
+- **Python 3.11 or higher** - The bot uses modern Python features
+- **Git** - For cloning repositories and the bot itself
+- **pip** - Python package manager (included with Python)
+
+### Optional Software
+
+- **Docker & Docker Compose** - For containerized deployment
+- **curl** - For health check testing
+
+### API Keys Required
+
+<Warning>
+You must obtain API keys from all three services before the bot can operate:
+- **Basescan API** (free tier available)
+- **Anthropic Claude API** (requires credits)
+- **Twitter API v2** (free tier with Essential access)
+</Warning>
+
+## Installation Methods
+
+Choose your preferred installation method:
+
+<CardGroup cols={2}>
+  <Card title="Python Virtualenv" icon="python">
+    Recommended for development and testing
+  </Card>
+  <Card title="Docker" icon="docker">
+    Recommended for production deployment
+  </Card>
+</CardGroup>
+
+## Method 1: Python Virtualenv
+
+<Steps>
+  <Step title="Install Python 3.11+">
+    Verify your Python version:
+
+    ```bash
+    python --version
+    ```
+
+    If you need to install or upgrade Python:
+
+    <CodeGroup>
+      ```bash Ubuntu/Debian
+      sudo apt update
+      sudo apt install python3.11 python3.11-venv python3-pip
+      ```
+
+      ```bash macOS (Homebrew)
+      brew install python@3.11
+      ```
+
+      ```bash Windows
+      # Download from https://www.python.org/downloads/
+      # Ensure "Add to PATH" is checked during installation
+      ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Clone the Repository">
+    ```bash
+    git clone https://github.com/yourusername/base-audit-bot.git
+    cd base-audit-bot
+    ```
+  </Step>
+
+  <Step title="Create Virtual Environment">
+    <CodeGroup>
+      ```bash Linux/Mac
+      python3.11 -m venv venv
+      source venv/bin/activate
+      ```
+
+      ```bash Windows
+      python -m venv venv
+      venv\Scripts\activate
+      ```
+    </CodeGroup>
+
+    <Info>
+    Your terminal prompt should change to show `(venv)` when the virtual environment is active.
+    </Info>
+  </Step>
+
+  <Step title="Install Dependencies">
+    ```bash
+    pip install --upgrade pip
+    pip install -r requirements.txt
+    ```
+
+    This installs the following packages:
+
+    | Package | Version | Purpose |
+    |---------|---------|----------|
+    | web3 | ≥6.0.0 | Ethereum/Base blockchain interaction |
+    | tweepy | ≥4.14.0 | Twitter API v2 client |
+    | anthropic | ≥0.40.0 | Claude AI API for auditing |
+    | flask | ≥3.0.0 | Webhook server |
+    | gitpython | ≥3.1.40 | Git repository operations |
+    | requests | ≥2.31.0 | HTTP requests |
+    | python-dotenv | ≥1.0.0 | Environment variable management |
+    | aiohttp | ≥3.9.0 | Async HTTP (optional) |
+  </Step>
+
+  <Step title="Verify Installation">
+    ```bash
+    python -c "import web3, tweepy, anthropic, flask, git; print('All dependencies installed!')"
+    ```
+
+    If successful, you'll see: `All dependencies installed!`
+  </Step>
+</Steps>
+
+## Method 2: Docker
+
+<Steps>
+  <Step title="Install Docker">
+    Install Docker and Docker Compose:
+
+    <CodeGroup>
+      ```bash Ubuntu/Debian
+      sudo apt update
+      sudo apt install docker.io docker-compose
+      sudo systemctl start docker
+      sudo systemctl enable docker
+      sudo usermod -aG docker $USER
+      ```
+
+      ```bash macOS
+      # Download and install Docker Desktop from:
+      # https://www.docker.com/products/docker-desktop
+      ```
+
+      ```bash Windows
+      # Download and install Docker Desktop from:
+      # https://www.docker.com/products/docker-desktop
+      ```
+    </CodeGroup>
+
+    Verify installation:
+
+    ```bash
+    docker --version
+    docker-compose --version
+    ```
+  </Step>
+
+  <Step title="Clone the Repository">
+    ```bash
+    git clone https://github.com/yourusername/base-audit-bot.git
+    cd base-audit-bot
+    ```
+  </Step>
+
+  <Step title="Review Docker Configuration">
+    The included `Dockerfile` defines the container:
+
+    ```dockerfile Dockerfile
+    FROM python:3.11-slim
+
+    WORKDIR /app
+
+    # Install git for cloning repos
+    RUN apt-get update && apt-get install -y git \
+        && rm -rf /var/lib/apt/lists/*
+
+    COPY requirements.txt .
+    RUN pip install --no-cache-dir -r requirements.txt
+
+    COPY *.py ./
+
+    RUN mkdir -p /app/data /app/logs /app/temp_repos
+
+    ENV PYTHONUNBUFFERED=1
+    ENV DATABASE_PATH=/app/data/bot.db
+    ENV TEMP_DIR=/app/temp_repos
+
+    EXPOSE 5000
+
+    CMD ["python", "bot.py"]
+    ```
+
+    The `docker-compose.yml` orchestrates the deployment:
+
+    ```yaml docker-compose.yml
+    version: '3.8'
+
+    services:
+      audit-bot:
+        build: .
+        container_name: base-audit-bot
+        restart: unless-stopped
+        ports:
+          - "5000:5000"
+        volumes:
+          - ./data:/app/data
+          - ./logs:/app/logs
+          - bot-temp:/app/temp_repos
+        env_file:
+          - .env
+        healthcheck:
+          test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+          interval: 30s
+          timeout: 10s
+          retries: 3
+
+    volumes:
+      bot-temp:
+        driver: local
+    ```
+  </Step>
+</Steps>
+
+## Obtaining API Keys
+
+### Basescan API Key
+
+<Steps>
+  <Step title="Create Account">
+    1. Navigate to [Basescan.org](https://basescan.org/)
+    2. Click "Sign In" → "Click to sign up"
+    3. Complete registration with email verification
+  </Step>
+
+  <Step title="Generate API Key">
+    1. Go to [API Keys page](https://basescan.org/myapikey)
+    2. Click "Add" to create a new API key
+    3. Give it a descriptive name (e.g., "Base Audit Bot")
+    4. Copy the generated API key
+  </Step>
+
+  <Step title="Add to Configuration">
+    ```bash .env
+    BASESCAN_API_KEY=YourBasescanApiKeyHere
+    ```
+
+    <Info>
+    The free tier allows **5 requests per second** and **100,000 requests per day**, which is sufficient for most use cases.
+    </Info>
+  </Step>
+</Steps>
+
+### Anthropic API Key
+
+<Steps>
+  <Step title="Create Account">
+    1. Visit [Anthropic Console](https://console.anthropic.com/)
+    2. Sign up with your email or Google account
+    3. Verify your email address
+  </Step>
+
+  <Step title="Add Credits">
+    1. Navigate to "Settings" → "Billing"
+    2. Add payment method and credits
+    3. The bot uses Claude Sonnet 4, which costs:
+       - **Input**: $3 per million tokens
+       - **Output**: $15 per million tokens
+
+    <Tip>
+    A typical smart contract audit uses 2,000-5,000 tokens, costing $0.01-$0.10 per audit.
+    </Tip>
+  </Step>
+
+  <Step title="Generate API Key">
+    1. Go to "API Keys" in the console
+    2. Click "Create Key"
+    3. Name it (e.g., "Base Audit Bot")
+    4. Copy the key immediately (it won't be shown again)
+  </Step>
+
+  <Step title="Add to Configuration">
+    ```bash .env
+    ANTHROPIC_API_KEY=sk-ant-api03-YourAnthropicKeyHere
+    ```
+  </Step>
+</Steps>
+
+### Twitter API Keys
+
+Twitter requires the most credentials (5 different keys/tokens):
+
+<Steps>
+  <Step title="Create Developer Account">
+    1. Go to [Twitter Developer Portal](https://developer.twitter.com/)
+    2. Sign in with your Twitter account
+    3. Click "Sign up for Free Account"
+    4. Complete the application form:
+       - Choose "Hobbyist" → "Making a bot"
+       - Describe your bot's purpose
+       - Agree to terms and conditions
+  </Step>
+
+  <Step title="Create Project and App">
+    1. In the Developer Portal, click "Projects & Apps"
+    2. Create a new Project (name: "Base Audit Bot")
+    3. Create an App within the project
+    4. Save the **API Key** and **API Secret** shown
+  </Step>
+
+  <Step title="Configure App Permissions">
+    1. Go to your app settings
+    2. Navigate to "User authentication settings"
+    3. Click "Set up"
+    4. Enable **OAuth 1.0a**
+    5. Set permissions to **Read and Write**
+    6. Add callback URL (can be placeholder: `https://example.com`)
+    7. Save changes
+  </Step>
+
+  <Step title="Generate Access Tokens">
+    1. Go to "Keys and Tokens" tab
+    2. Under "Authentication Tokens", click "Generate" for:
+       - **Access Token**
+       - **Access Token Secret**
+    3. Also generate a **Bearer Token** if not already present
+    4. Copy all tokens immediately
+  </Step>
+
+  <Step title="Add to Configuration">
+    You should now have all 5 credentials:
+
+    ```bash .env
+    TWITTER_API_KEY=YourApiKeyHere
+    TWITTER_API_SECRET=YourApiSecretHere
+    TWITTER_ACCESS_TOKEN=YourAccessTokenHere
+    TWITTER_ACCESS_SECRET=YourAccessSecretHere
+    TWITTER_BEARER_TOKEN=YourBearerTokenHere
+    ```
+
+    <Warning>
+    Keep these credentials secret! Never commit them to version control.
+    </Warning>
+  </Step>
+</Steps>
+
+## Configuration
+
+<Steps>
+  <Step title="Create .env File">
+    Copy the example environment file:
+
+    ```bash
+    cp .env.example .env
+    ```
+  </Step>
+
+  <Step title="Edit Configuration">
+    Open `.env` in your editor and configure all settings:
+
+    ```bash .env
+    # Base Chain Configuration
+    BASE_RPC_URL=https://mainnet.base.org
+    BASESCAN_API_KEY=your_basescan_api_key_here
+
+    # Anthropic API
+    ANTHROPIC_API_KEY=your_anthropic_api_key_here
+
+    # Twitter API v2 Credentials
+    TWITTER_API_KEY=your_twitter_api_key_here
+    TWITTER_API_SECRET=your_twitter_api_secret_here
+    TWITTER_ACCESS_TOKEN=your_twitter_access_token_here
+    TWITTER_ACCESS_SECRET=your_twitter_access_secret_here
+    TWITTER_BEARER_TOKEN=your_twitter_bearer_token_here
+
+    # Webhook Configuration (optional)
+    WEBHOOK_SECRET=your_random_webhook_secret_here
+    WEBHOOK_PORT=5000
+
+    # Bot Configuration
+    SCAN_INTERVAL_MINUTES=15
+    BLOCKS_TO_SCAN=100
+    MIN_CONTRACT_SIZE=100
+    LOG_LEVEL=INFO
+
+    # Database
+    DATABASE_PATH=./data/bot.db
+
+    # Temporary Directory for Cloning
+    TEMP_DIR=./temp_repos
+    ```
+  </Step>
+
+  <Step title="Configuration Reference">
+    | Variable | Description | Default | Required |
+    |----------|-------------|---------|----------|
+    | `BASE_RPC_URL` | Base mainnet RPC endpoint | `https://mainnet.base.org` | Yes |
+    | `BASESCAN_API_KEY` | Basescan API key for contract verification | - | Yes |
+    | `ANTHROPIC_API_KEY` | Anthropic API key for Claude | - | Yes |
+    | `TWITTER_API_KEY` | Twitter OAuth 1.0a consumer key | - | Yes |
+    | `TWITTER_API_SECRET` | Twitter OAuth 1.0a consumer secret | - | Yes |
+    | `TWITTER_ACCESS_TOKEN` | Twitter access token | - | Yes |
+    | `TWITTER_ACCESS_SECRET` | Twitter access token secret | - | Yes |
+    | `TWITTER_BEARER_TOKEN` | Twitter API v2 bearer token | - | No* |
+    | `WEBHOOK_SECRET` | Secret for GitHub webhook verification | - | No |
+    | `WEBHOOK_PORT` | Port for webhook server | `5000` | No |
+    | `SCAN_INTERVAL_MINUTES` | Minutes between scans | `15` | No |
+    | `BLOCKS_TO_SCAN` | Number of blocks to scan per cycle | `100` | No |
+    | `MIN_CONTRACT_SIZE` | Minimum bytecode size (bytes) | `100` | No |
+    | `LOG_LEVEL` | Logging verbosity | `INFO` | No |
+    | `DATABASE_PATH` | SQLite database location | `./data/bot.db` | No |
+    | `TEMP_DIR` | Temporary directory for clones | `./temp_repos` | No |
+
+    <Info>
+    *Bearer token is required for some Twitter API v2 endpoints like DM reading.
+    </Info>
+  </Step>
+
+  <Step title="Generate Webhook Secret">
+    If you plan to use GitHub webhooks, generate a secure random secret:
+
+    ```bash
+    python -c "import secrets; print(secrets.token_urlsafe(32))"
+    ```
+
+    Add it to your `.env`:
+
+    ```bash .env
+    WEBHOOK_SECRET=your_generated_secret_here
+    ```
+  </Step>
+</Steps>
+
+## Running the Bot
+
+### Python Virtualenv
+
+<CodeGroup>
+  ```bash Start Bot
+  python bot.py
+  ```
+
+  ```bash Start with Logs
+  python bot.py 2>&1 | tee output.log
+  ```
+
+  ```bash Background Process
+  nohup python bot.py > output.log 2>&1 &
+  ```
+</CodeGroup>
+
+### Docker
+
+<CodeGroup>
+  ```bash Build and Start
+  docker-compose up -d
+  ```
+
+  ```bash View Logs
+  docker-compose logs -f audit-bot
+  ```
+
+  ```bash Stop Bot
+  docker-compose down
+  ```
+
+  ```bash Restart Bot
+  docker-compose restart audit-bot
+  ```
+
+  ```bash Rebuild After Code Changes
+  docker-compose up -d --build
+  ```
+</CodeGroup>
+
+## Verification
+
+<Steps>
+  <Step title="Check Bot Startup">
+    Verify the bot initializes all components:
+
+    ```bash
+    # For Python
+    tail -f ./logs/bot.log
+
+    # For Docker
+    docker-compose logs audit-bot
+    ```
+
+    You should see:
+    ```
+    INFO - Initializing Base Audit Bot...
+    INFO - Database initialized
+    INFO - Connected to Base mainnet. Chain ID: 8453
+    INFO - Blockchain scanner initialized
+    INFO - GitHub finder initialized
+    INFO - Auditor initialized
+    INFO - Twitter bot initialized
+    INFO - Base Audit Bot initialized successfully
+    INFO - Starting main loop (interval: 15 minutes)
+    ```
+  </Step>
+
+  <Step title="Test Webhook Server">
+    If webhooks are enabled, test the health endpoint:
+
+    ```bash
+    curl http://localhost:5000/health
+    ```
+
+    Expected response:
+    ```json
+    {"status": "healthy"}
+    ```
+  </Step>
+
+  <Step title="Verify Database Creation">
+    Check that the SQLite database was created:
+
+    ```bash
+    ls -lh ./data/bot.db
+    ```
+
+    Inspect tables:
+
+    ```bash
+    sqlite3 ./data/bot.db ".tables"
+    ```
+
+    Expected output:
+    ```
+    audits          contracts       monitored_repos tweets          blocklist
+    ```
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="gear" href="/guides/configuration">
+    Customize bot behavior and settings
+  </Card>
+  <Card title="Webhook Setup" icon="webhook" href="/guides/webhook-setup">
+    Configure GitHub webhooks for repository monitoring
+  </Card>
+  <Card title="Deployment" icon="rocket" href="/guides/deployment">
+    Deploy to production environments
+  </Card>
+  <Card title="Troubleshooting" icon="wrench" href="/guides/troubleshooting">
+    Common issues and solutions
+  </Card>
+</CardGroup>

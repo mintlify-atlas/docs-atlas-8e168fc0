@@ -1,0 +1,461 @@
+---
+title: Deployment
+description: Deployment strategies and production setup for Base Audit Bot
+---
+
+## Overview
+
+Base Audit Bot can be deployed in multiple ways depending on your infrastructure preferences. This guide covers deployment strategies, production considerations, and best practices.
+
+## Deployment Options
+
+<CardGroup cols={2}>
+  <Card title="Docker Compose" icon="docker" href="#docker-compose-deployment">
+    Recommended for most use cases. Simple, reproducible, and includes volume management.
+  </Card>
+  <Card title="Docker" icon="docker" href="#standalone-docker">
+    Direct Docker deployment for custom orchestration or Kubernetes.
+  </Card>
+  <Card title="Python" icon="python" href="#python-deployment">
+    Run directly with Python for development or simple deployments.
+  </Card>
+  <Card title="Cloud" icon="cloud" href="#cloud-deployment">
+    Deploy to cloud platforms like AWS, GCP, or Azure.
+  </Card>
+</CardGroup>
+
+## Docker Compose Deployment
+
+<Note>
+  **Recommended approach** - Includes automatic restart, volume management, health checks, and log rotation.
+</Note>
+
+### Prerequisites
+
+- Docker Engine 20.10+
+- Docker Compose 2.0+
+- Configured `.env` file
+
+### Deployment Steps
+
+<Steps>
+  <Step title="Configure environment">
+    Copy and configure your `.env` file:
+    ```bash
+    cp .env.example .env
+    nano .env  # Edit with your API keys
+    ```
+  </Step>
+  
+  <Step title="Create data directories">
+    ```bash
+    mkdir -p data logs
+    ```
+  </Step>
+  
+  <Step title="Build and start the container">
+    ```bash
+    docker-compose up -d
+    ```
+    
+    This will:
+    - Build the Docker image from `Dockerfile`
+    - Create persistent volumes for data and logs
+    - Start the container in detached mode
+    - Enable automatic restart on failure
+  </Step>
+  
+  <Step title="Verify deployment">
+    Check container status:
+    ```bash
+    docker-compose ps
+    ```
+    
+    View logs:
+    ```bash
+    docker-compose logs -f
+    ```
+    
+    Check health:
+    ```bash
+    curl http://localhost:5000/health
+    ```
+  </Step>
+</Steps>
+
+### Container Configuration
+
+The `docker-compose.yml` includes production-ready settings:
+
+```yaml
+services:
+  audit-bot:
+    restart: unless-stopped  # Automatic restart
+    ports:
+      - "5000:5000"          # Webhook server
+    volumes:
+      - ./data:/app/data     # Persistent database
+      - ./logs:/app/logs     # Persistent logs
+      - bot-temp:/app/temp_repos  # Ephemeral clones
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"      # Rotate at 10MB
+        max-file: "3"        # Keep 3 files
+```
+
+### Management Commands
+
+```bash
+# Start the bot
+docker-compose up -d
+
+# Stop the bot
+docker-compose down
+
+# Restart the bot
+docker-compose restart
+
+# View logs
+docker-compose logs -f
+
+# View recent logs
+docker-compose logs --tail=100
+
+# Update to latest code
+git pull
+docker-compose build
+docker-compose up -d
+
+# Clean rebuild
+docker-compose down
+docker-compose build --no-cache
+docker-compose up -d
+```
+
+## Standalone Docker
+
+For custom orchestration or Kubernetes deployments.
+
+<Steps>
+  <Step title="Build the image">
+    ```bash
+    docker build -t base-audit-bot .
+    ```
+  </Step>
+  
+  <Step title="Run the container">
+    ```bash
+    docker run -d \
+      --name base-audit-bot \
+      --restart unless-stopped \
+      -p 5000:5000 \
+      -v $(pwd)/data:/app/data \
+      -v $(pwd)/logs:/app/logs \
+      --env-file .env \
+      base-audit-bot
+    ```
+  </Step>
+</Steps>
+
+## Python Deployment
+
+For development or simple production deployments without Docker.
+
+<Steps>
+  <Step title="Install Python 3.11+">
+    ```bash
+    python --version  # Verify Python 3.11+
+    ```
+  </Step>
+  
+  <Step title="Create virtual environment">
+    ```bash
+    python -m venv venv
+    source venv/bin/activate  # On Windows: venv\Scripts\activate
+    ```
+  </Step>
+  
+  <Step title="Install dependencies">
+    ```bash
+    pip install -r requirements.txt
+    ```
+  </Step>
+  
+  <Step title="Configure environment">
+    ```bash
+    cp .env.example .env
+    nano .env
+    ```
+  </Step>
+  
+  <Step title="Run the bot">
+    ```bash
+    python bot.py
+    ```
+    
+    <Tip>
+      Use a process manager like `systemd`, `supervisor`, or `pm2` for production.
+    </Tip>
+  </Step>
+</Steps>
+
+### Systemd Service (Linux)
+
+Create `/etc/systemd/system/base-audit-bot.service`:
+
+```ini
+[Unit]
+Description=Base Audit Bot
+After=network.target
+
+[Service]
+Type=simple
+User=botuser
+WorkingDirectory=/opt/base-audit-bot
+Environment="PATH=/opt/base-audit-bot/venv/bin"
+ExecStart=/opt/base-audit-bot/venv/bin/python bot.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable and start:
+```bash
+sudo systemctl enable base-audit-bot
+sudo systemctl start base-audit-bot
+sudo systemctl status base-audit-bot
+```
+
+## Cloud Deployment
+
+### AWS (ECS/EC2)
+
+<Steps>
+  <Step title="Push image to ECR">
+    ```bash
+    aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin <account>.dkr.ecr.us-east-1.amazonaws.com
+    docker tag base-audit-bot:latest <account>.dkr.ecr.us-east-1.amazonaws.com/base-audit-bot:latest
+    docker push <account>.dkr.ecr.us-east-1.amazonaws.com/base-audit-bot:latest
+    ```
+  </Step>
+  
+  <Step title="Create ECS task definition">
+    Configure environment variables in ECS task definition or use AWS Secrets Manager.
+  </Step>
+  
+  <Step title="Deploy to ECS">
+    Use ECS service with:
+    - Desired count: 1
+    - Load balancer: Optional (for webhook endpoint)
+    - Auto-restart enabled
+  </Step>
+</Steps>
+
+<Tip>
+  Use AWS Secrets Manager for secure credential storage:
+  ```bash
+  aws secretsmanager create-secret --name base-audit-bot/config --secret-string file://.env
+  ```
+</Tip>
+
+### Google Cloud (Cloud Run)
+
+```bash
+# Build and deploy
+gcloud builds submit --tag gcr.io/PROJECT-ID/base-audit-bot
+gcloud run deploy base-audit-bot \
+  --image gcr.io/PROJECT-ID/base-audit-bot \
+  --platform managed \
+  --region us-central1 \
+  --allow-unauthenticated \
+  --env-vars-file .env.yaml
+```
+
+### DigitalOcean App Platform
+
+1. Connect your GitHub repository
+2. Configure environment variables in the dashboard
+3. Set port to 5000
+4. Deploy
+
+## Production Considerations
+
+### Security
+
+<Warning>
+  **Critical security practices:**
+  
+  - Never expose `.env` file or commit to version control
+  - Use strong webhook secrets (32+ random characters)
+  - Restrict webhook endpoint to GitHub IPs if possible
+  - Enable HTTPS for webhook endpoint
+  - Rotate API keys regularly
+  - Monitor logs for suspicious activity
+</Warning>
+
+### Networking
+
+<AccordionGroup>
+  <Accordion title="Firewall Configuration">
+    Required ports:
+    - **5000/tcp**: Webhook server (inbound)
+    - **443/tcp**: HTTPS for API calls (outbound)
+    
+    ```bash
+    # Example: UFW firewall
+    sudo ufw allow 5000/tcp
+    ```
+  </Accordion>
+  
+  <Accordion title="Reverse Proxy (Nginx)">
+    For production webhook endpoints:
+    
+    ```nginx
+    server {
+        listen 443 ssl;
+        server_name bot.yourdomain.com;
+        
+        ssl_certificate /etc/letsencrypt/live/bot.yourdomain.com/fullchain.pem;
+        ssl_certificate_key /etc/letsencrypt/live/bot.yourdomain.com/privkey.pem;
+        
+        location /webhook/github {
+            proxy_pass http://localhost:5000;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        
+        location /health {
+            proxy_pass http://localhost:5000;
+        }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Monitoring
+
+<Steps>
+  <Step title="Health checks">
+    Monitor the health endpoint:
+    ```bash
+    curl http://localhost:5000/health
+    ```
+    
+    Expected response:
+    ```json
+    {"status": "healthy", "timestamp": "2026-03-03T12:00:00.000000"}
+    ```
+  </Step>
+  
+  <Step title="Log monitoring">
+    Set up log aggregation:
+    - Docker: Use `json-file` driver with rotation (already configured)
+    - Production: Forward to ELK, Datadog, or CloudWatch
+    - Alert on ERROR and CRITICAL logs
+  </Step>
+  
+  <Step title="Database monitoring">
+    Monitor database growth:
+    ```bash
+    ls -lh data/bot.db
+    ```
+    
+    Check recent activity:
+    ```bash
+    sqlite3 data/bot.db "SELECT COUNT(*) FROM audits WHERE date(audit_date) = date('now')"
+    ```
+  </Step>
+</Steps>
+
+### Resource Requirements
+
+<Tip>
+  **Recommended minimum resources:**
+  - CPU: 1 core
+  - RAM: 1 GB
+  - Disk: 10 GB (for database, logs, temp repos)
+  - Network: Stable internet connection with low latency to RPC endpoint
+</Tip>
+
+### Backup Strategy
+
+<Warning>
+  **Backup the database regularly** to prevent data loss.
+</Warning>
+
+```bash
+# Automated daily backup
+#!/bin/bash
+# backup.sh
+
+BACKUP_DIR="/backups/base-audit-bot"
+DATE=$(date +%Y%m%d_%H%M%S)
+
+mkdir -p $BACKUP_DIR
+cp data/bot.db "$BACKUP_DIR/bot_$DATE.db"
+
+# Keep last 30 days
+find $BACKUP_DIR -name "bot_*.db" -mtime +30 -delete
+```
+
+Add to crontab:
+```bash
+0 2 * * * /opt/base-audit-bot/backup.sh
+```
+
+### Scaling Considerations
+
+<Note>
+  The bot is designed to run as a single instance. For high-volume deployments:
+  
+  - Use multiple instances with different contract filters
+  - Implement distributed locking for database writes
+  - Consider Redis for shared state
+  - Use message queue for audit requests
+</Note>
+
+## Updating the Bot
+
+<Steps>
+  <Step title="Pull latest changes">
+    ```bash
+    git pull origin main
+    ```
+  </Step>
+  
+  <Step title="Rebuild (Docker)">
+    ```bash
+    docker-compose down
+    docker-compose build
+    docker-compose up -d
+    ```
+  </Step>
+  
+  <Step title="Update dependencies (Python)">
+    ```bash
+    pip install -r requirements.txt --upgrade
+    ```
+  </Step>
+  
+  <Step title="Verify">
+    ```bash
+    docker-compose logs -f  # or check Python logs
+    curl http://localhost:5000/health
+    ```
+  </Step>
+</Steps>
+
+## Troubleshooting Deployment
+
+See the [Troubleshooting Guide](/guides/troubleshooting) for common deployment issues and solutions.

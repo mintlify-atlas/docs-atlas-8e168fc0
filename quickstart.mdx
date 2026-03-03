@@ -1,80 +1,291 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: "Quick Start"
+description: "Get Base Audit Bot running in under 5 minutes"
 ---
 
-## Get started in three steps
+# Quick Start
 
-Get your documentation site running locally and make your first customization.
-
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+Get the Base Audit Bot up and running in minutes. This guide will take you from zero to a fully operational bot monitoring the Base blockchain.
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+**Prerequisites**: Python 3.11+, Git, and API keys for Basescan, Anthropic, and Twitter. See [Installation](/installation) for detailed setup.
 </Note>
+
+<Steps>
+  <Step title="Clone the Repository">
+    First, clone or download the Base Audit Bot repository:
+
+    ```bash
+    git clone https://github.com/yourusername/base-audit-bot.git
+    cd base-audit-bot
+    ```
+  </Step>
+
+  <Step title="Create Virtual Environment">
+    Set up a Python virtual environment to isolate dependencies:
+
+    <CodeGroup>
+      ```bash Linux/Mac
+      python -m venv venv
+      source venv/bin/activate
+      ```
+
+      ```bash Windows
+      python -m venv venv
+      venv\Scripts\activate
+      ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Install Dependencies">
+    Install all required Python packages:
+
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+    This installs:
+    - `web3>=6.0.0` - Blockchain interaction
+    - `anthropic>=0.40.0` - Claude AI API
+    - `tweepy>=4.14.0` - Twitter integration
+    - `flask>=3.0.0` - Webhook server
+    - `gitpython>=3.1.40` - Repository cloning
+    - `requests>=2.31.0` - HTTP client
+    - `python-dotenv>=1.0.0` - Environment configuration
+  </Step>
+
+  <Step title="Configure Environment">
+    Copy the environment template and add your API keys:
+
+    ```bash
+    cp .env.example .env
+    ```
+
+    Edit `.env` with your favorite editor and add your credentials:
+
+    ```bash .env
+    # Base Chain Configuration
+    BASE_RPC_URL=https://mainnet.base.org
+    BASESCAN_API_KEY=your_basescan_api_key_here
+
+    # Anthropic API
+    ANTHROPIC_API_KEY=your_anthropic_api_key_here
+
+    # Twitter API v2 Credentials
+    TWITTER_API_KEY=your_twitter_api_key_here
+    TWITTER_API_SECRET=your_twitter_api_secret_here
+    TWITTER_ACCESS_TOKEN=your_twitter_access_token_here
+    TWITTER_ACCESS_SECRET=your_twitter_access_secret_here
+    TWITTER_BEARER_TOKEN=your_twitter_bearer_token_here
+
+    # Webhook Configuration (optional)
+    WEBHOOK_SECRET=your_random_webhook_secret_here
+    WEBHOOK_PORT=5000
+
+    # Bot Configuration
+    SCAN_INTERVAL_MINUTES=15
+    BLOCKS_TO_SCAN=100
+    MIN_CONTRACT_SIZE=100
+    LOG_LEVEL=INFO
+    ```
+
+    <Info>
+    See [Installation](/installation#obtaining-api-keys) for detailed instructions on obtaining each API key.
+    </Info>
+  </Step>
+
+  <Step title="Run the Bot">
+    Start the bot:
+
+    ```bash
+    python bot.py
+    ```
+
+    You should see output similar to:
+
+    ```
+    2026-03-03 10:00:00,123 - __main__ - INFO - Initializing Base Audit Bot...
+    2026-03-03 10:00:00,234 - __main__ - INFO - Database initialized
+    2026-03-03 10:00:00,345 - scanner - INFO - Connected to Base mainnet. Chain ID: 8453
+    2026-03-03 10:00:00,456 - __main__ - INFO - Blockchain scanner initialized
+    2026-03-03 10:00:00,567 - __main__ - INFO - GitHub finder initialized
+    2026-03-03 10:00:00,678 - __main__ - INFO - Auditor initialized
+    2026-03-03 10:00:00,789 - __main__ - INFO - Twitter bot initialized
+    2026-03-03 10:00:00,890 - __main__ - INFO - Webhook server configured on port 5000
+    2026-03-03 10:00:00,901 - __main__ - INFO - Base Audit Bot initialized successfully
+    2026-03-03 10:00:01,012 - __main__ - INFO - Starting main loop (interval: 15 minutes)
+    2026-03-03 10:00:01,123 - __main__ - INFO - Starting scan cycle...
+    2026-03-03 10:00:01,234 - __main__ - INFO - Scanned blocks 12345600 to 12345700, found 3 deployments
+    ```
+  </Step>
+
+  <Step title="Verify Operation">
+    The bot is now running! Here's what it's doing:
+
+    - **Scanning blocks** every 15 minutes (configurable)
+    - **Finding contracts** with bytecode size ≥ 100 bytes
+    - **Checking verification** status on Basescan
+    - **Discovering GitHub repos** from verified source code
+    - **Running audits** with Claude AI
+    - **Posting to Twitter** when issues are found
+
+    Check the logs in `./logs/bot.log` for detailed activity:
+
+    ```bash
+    tail -f ./logs/bot.log
+    ```
+  </Step>
+</Steps>
+
+## What Happens Next?
+
+Once running, the bot operates autonomously:
+
+1. **Every 15 minutes** (by default), it scans the latest 100 blocks on Base
+2. For each new contract deployment found:
+   - Checks if the contract is verified on Basescan
+   - Attempts to find the GitHub repository
+   - Clones the repo and finds all Solidity files
+   - Sends each file to Claude for security analysis
+   - Aggregates findings by severity (Critical/High/Medium/Low)
+   - Posts audit results to Twitter with contract details
+3. **Monitors repositories** for updates via webhooks
+4. **Posts daily summaries** at midnight UTC
+5. **Responds to DM commands** for manual audit requests
+
+## Expected Output
+
+### Successful Contract Audit
+
+```
+2026-03-03 10:15:23,456 - __main__ - INFO - Processing new contract: 0x1234567890abcdef1234567890abcdef12345678
+2026-03-03 10:15:24,567 - __main__ - INFO - Saved contract 0x1234... (verified: True, repo: https://github.com/user/token)
+2026-03-03 10:15:25,678 - __main__ - INFO - Auditing contract 0x1234... from repo https://github.com/user/token
+2026-03-03 10:15:26,789 - auditor - INFO - Cloning https://github.com/user/token
+2026-03-03 10:15:30,890 - auditor - INFO - Found 5 Solidity files to audit
+2026-03-03 10:15:31,901 - auditor - INFO - Auditing: TokenContract.sol
+2026-03-03 10:15:45,012 - auditor - INFO - Auditing: Vault.sol
+2026-03-03 10:16:00,123 - __main__ - INFO - Audit complete: 3 issues found
+2026-03-03 10:16:01,234 - __main__ - INFO - Posted audit tweet: 1234567890123456789
+```
+
+### Unverified Contract (Skipped)
+
+```
+2026-03-03 10:20:15,345 - __main__ - INFO - Processing new contract: 0xabcdef1234567890abcdef1234567890abcdef12
+2026-03-03 10:20:16,456 - __main__ - INFO - Saved contract 0xabcdef... (verified: False, repo: None)
+```
+
+## Testing the Bot
+
+<Tip>
+Before running in production, test with a short scan interval and limited block range:
+
+```bash .env
+SCAN_INTERVAL_MINUTES=5
+BLOCKS_TO_SCAN=10
+```
+</Tip>
+
+### Test DM Commands
+
+Send a direct message to your Twitter bot account:
+
+```
+audit 0x1234567890abcdef1234567890abcdef12345678
+```
+
+The bot should respond with:
+
+```
+Checking contract 0x1234567890abcdef1234567890abcdef12345678...
+```
+
+And after the audit completes:
+
+```
+Audit complete for 0x1234567890abcdef1234567890abcdef12345678. Check our timeline for results.
+```
+
+## Docker Quick Start
+
+Prefer containers? Use Docker Compose:
+
+<Steps>
+  <Step title="Configure Environment">
+    Create your `.env` file as described above.
+  </Step>
+
+  <Step title="Build and Run">
+    ```bash
+    docker-compose up -d
+    ```
+  </Step>
+
+  <Step title="View Logs">
+    ```bash
+    docker-compose logs -f audit-bot
+    ```
+  </Step>
+
+  <Step title="Stop the Bot">
+    ```bash
+    docker-compose down
+    ```
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+### Bot won't start
+
+<CodeGroup>
+  ```bash Check Python Version
+  python --version
+  # Should be 3.11 or higher
+  ```
+
+  ```bash Verify Dependencies
+  pip list | grep -E "web3|anthropic|tweepy"
+  ```
+
+  ```bash Check Environment
+  cat .env | grep -E "API_KEY|RPC_URL"
+  # Ensure no placeholder values remain
+  ```
+</CodeGroup>
+
+### No contracts being found
+
+- **Check RPC connection**: Verify `BASE_RPC_URL` is accessible
+- **Increase block range**: Set `BLOCKS_TO_SCAN=1000` for more coverage
+- **Lower size threshold**: Set `MIN_CONTRACT_SIZE=50` to catch smaller contracts
+
+### Twitter posting fails
+
+- Verify all 5 Twitter credentials are set correctly
+- Check app permissions include read/write access
+- Ensure rate limits aren't exceeded (bot respects limits)
+
+### Audits not running
+
+- Check `ANTHROPIC_API_KEY` is valid and has credits
+- Verify contracts are verified on Basescan
+- Check logs for specific Claude API errors
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Installation Guide" icon="book" href="/installation">
+    Detailed setup instructions and API key generation
+  </Card>
+  <Card title="Configuration" icon="gear" href="/guides/configuration">
+    Customize scan intervals, webhook setup, and more
+  </Card>
+  <Card title="Architecture" icon="sitemap" href="/concepts/architecture">
+    Understand how the bot components work together
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/audit-bot">
+    Explore the codebase and extend functionality
+  </Card>
+</CardGroup>

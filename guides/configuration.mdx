@@ -1,0 +1,331 @@
+---
+title: Configuration
+description: Environment variables and configuration options for Base Audit Bot
+---
+
+## Overview
+
+Base Audit Bot uses environment variables for configuration. All settings are loaded from a `.env` file and validated on startup.
+
+## Configuration File Setup
+
+<Steps>
+  <Step title="Copy the environment template">
+    ```bash
+    cp .env.example .env
+    ```
+  </Step>
+  
+  <Step title="Edit the configuration file">
+    Open `.env` in your text editor and configure the required variables.
+  </Step>
+  
+  <Step title="Validate configuration">
+    The bot automatically validates configuration on startup. Check logs for any validation errors.
+  </Step>
+</Steps>
+
+## Required Environment Variables
+
+### Base Chain Configuration
+
+<AccordionGroup>
+  <Accordion title="BASE_RPC_URL">
+    **Type:** String (URL)  
+    **Default:** `https://mainnet.base.org`  
+    **Required:** Yes
+    
+    The RPC endpoint URL for Base mainnet. Must be a valid HTTP(S) URL.
+    
+    ```env
+    BASE_RPC_URL=https://mainnet.base.org
+    ```
+    
+    <Note>
+      The bot validates that this value starts with `http` or `https` on startup.
+    </Note>
+  </Accordion>
+  
+  <Accordion title="BASESCAN_API_KEY">
+    **Type:** String  
+    **Required:** Yes
+    
+    Your Basescan API key for fetching verified contract source code.
+    
+    ```env
+    BASESCAN_API_KEY=your_basescan_api_key_here
+    ```
+    
+    <Tip>
+      Get a free API key at [https://basescan.org/apis](https://basescan.org/apis)
+    </Tip>
+  </Accordion>
+</AccordionGroup>
+
+### Anthropic API Configuration
+
+<Accordion title="ANTHROPIC_API_KEY">
+  **Type:** String  
+  **Required:** Yes
+  
+  Your Anthropic API key for Claude AI-powered contract auditing.
+  
+  ```env
+  ANTHROPIC_API_KEY=your_anthropic_api_key_here
+  ```
+  
+  <Tip>
+    Create an account and get your API key at [https://console.anthropic.com/](https://console.anthropic.com/)
+  </Tip>
+</Accordion>
+
+### Twitter API Configuration
+
+<AccordionGroup>
+  <Accordion title="Twitter API v2 Credentials">
+    **All Required:** Yes
+    
+    The bot requires full Twitter API v2 credentials with OAuth 1.0a for posting tweets and reading DMs.
+    
+    ```env
+    TWITTER_API_KEY=your_twitter_api_key_here
+    TWITTER_API_SECRET=your_twitter_api_secret_here
+    TWITTER_ACCESS_TOKEN=your_twitter_access_token_here
+    TWITTER_ACCESS_SECRET=your_twitter_access_secret_here
+    TWITTER_BEARER_TOKEN=your_twitter_bearer_token_here
+    ```
+    
+    <Warning>
+      All 5 credentials are required. Missing any will prevent the bot from starting.
+    </Warning>
+    
+    <Steps>
+      <Step title="Create Twitter Developer Account">
+        Go to [https://developer.twitter.com/](https://developer.twitter.com/) and create an account.
+      </Step>
+      
+      <Step title="Create a Project and App">
+        Create a new project and app in the developer portal.
+      </Step>
+      
+      <Step title="Enable OAuth 1.0a">
+        Enable OAuth 1.0a with read/write permissions in your app settings.
+      </Step>
+      
+      <Step title="Generate Tokens">
+        Generate all required API keys and access tokens.
+      </Step>
+    </Steps>
+  </Accordion>
+</AccordionGroup>
+
+### Webhook Configuration
+
+<AccordionGroup>
+  <Accordion title="WEBHOOK_SECRET">
+    **Type:** String  
+    **Required:** For webhook functionality  
+    **Default:** Empty string
+    
+    Secret key for verifying GitHub webhook signatures using HMAC-SHA256.
+    
+    ```env
+    WEBHOOK_SECRET=your_random_webhook_secret_here
+    ```
+    
+    <Warning>
+      Use a strong, randomly generated secret. This must match the secret configured in your GitHub webhook settings.
+    </Warning>
+    
+    <Tip>
+      Generate a secure secret:
+      ```bash
+      openssl rand -hex 32
+      ```
+    </Tip>
+  </Accordion>
+  
+  <Accordion title="WEBHOOK_PORT">
+    **Type:** Integer  
+    **Default:** `5000`  
+    **Required:** No
+    
+    Port number for the webhook server to listen on.
+    
+    ```env
+    WEBHOOK_PORT=5000
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Optional Configuration
+
+### Bot Behavior Settings
+
+<AccordionGroup>
+  <Accordion title="SCAN_INTERVAL_MINUTES">
+    **Type:** Integer  
+    **Default:** `15`  
+    **Minimum:** `1`
+    
+    How frequently (in minutes) the bot scans for new contract deployments.
+    
+    ```env
+    SCAN_INTERVAL_MINUTES=15
+    ```
+    
+    <Note>
+      The bot validates this is at least 1 on startup.
+    </Note>
+  </Accordion>
+  
+  <Accordion title="BLOCKS_TO_SCAN">
+    **Type:** Integer  
+    **Default:** `100`  
+    **Minimum:** `1`
+    
+    Number of recent blocks to scan for new contract deployments each interval.
+    
+    ```env
+    BLOCKS_TO_SCAN=100
+    ```
+  </Accordion>
+  
+  <Accordion title="MIN_CONTRACT_SIZE">
+    **Type:** Integer  
+    **Default:** `100`
+    
+    Minimum contract bytecode size (in bytes) to audit. Filters out very small contracts.
+    
+    ```env
+    MIN_CONTRACT_SIZE=100
+    ```
+  </Accordion>
+  
+  <Accordion title="LOG_LEVEL">
+    **Type:** String  
+    **Default:** `INFO`  
+    **Options:** `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`
+    
+    Logging verbosity level.
+    
+    ```env
+    LOG_LEVEL=INFO
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Storage Configuration
+
+<AccordionGroup>
+  <Accordion title="DATABASE_PATH">
+    **Type:** File Path  
+    **Default:** `./data/bot.db`
+    
+    Path to SQLite database file for persistent storage.
+    
+    ```env
+    DATABASE_PATH=./data/bot.db
+    ```
+    
+    <Note>
+      The directory will be created automatically if it doesn't exist.
+    </Note>
+  </Accordion>
+  
+  <Accordion title="TEMP_DIR">
+    **Type:** Directory Path  
+    **Default:** `./temp_repos`
+    
+    Directory for temporarily cloning GitHub repositories during audits.
+    
+    ```env
+    TEMP_DIR=./temp_repos
+    ```
+    
+    <Tip>
+      This directory can be safely cleared periodically to free up disk space.
+    </Tip>
+  </Accordion>
+</AccordionGroup>
+
+## Configuration Validation
+
+The bot performs automatic validation on startup through the `Config.validate()` method in `config.py:92`:
+
+- **BASE_RPC_URL**: Must start with `http` or `https`
+- **SCAN_INTERVAL_MINUTES**: Must be at least 1
+- **BLOCKS_TO_SCAN**: Must be at least 1
+- **Required fields**: All required environment variables must be present
+
+<Warning>
+  If validation fails, the bot will exit with an error message indicating which configuration is invalid.
+</Warning>
+
+## Example Configuration
+
+Here's a complete example `.env` file:
+
+```env
+# Base Chain Configuration
+BASE_RPC_URL=https://mainnet.base.org
+BASESCAN_API_KEY=ABC123XYZ789
+
+# Anthropic API
+ANTHROPIC_API_KEY=sk-ant-api03-xyz
+
+# Twitter API v2 Credentials
+TWITTER_API_KEY=abc123
+TWITTER_API_SECRET=secret123
+TWITTER_ACCESS_TOKEN=token123
+TWITTER_ACCESS_SECRET=tokensecret123
+TWITTER_BEARER_TOKEN=bearer123
+
+# Webhook Configuration
+WEBHOOK_SECRET=a1b2c3d4e5f6g7h8i9j0
+WEBHOOK_PORT=5000
+
+# Bot Configuration
+SCAN_INTERVAL_MINUTES=15
+BLOCKS_TO_SCAN=100
+MIN_CONTRACT_SIZE=100
+LOG_LEVEL=INFO
+
+# Database
+DATABASE_PATH=./data/bot.db
+
+# Temporary Directory for Cloning
+TEMP_DIR=./temp_repos
+```
+
+## Security Best Practices
+
+<Warning>
+  **Never commit your `.env` file to version control!**
+  
+  Add it to `.gitignore`:
+  ```bash
+  echo ".env" >> .gitignore
+  ```
+</Warning>
+
+<Tip>
+  Additional security recommendations:
+  - Use strong, randomly generated secrets for `WEBHOOK_SECRET`
+  - Rotate API keys regularly
+  - Restrict API key permissions to minimum required
+  - Monitor API usage for anomalies
+  - Store production credentials securely (e.g., environment variables, secrets manager)
+</Tip>
+
+## Loading Configuration
+
+The configuration is loaded automatically from the `.env` file using the `Config.from_env()` method in `config.py:44`:
+
+```python
+from config import get_config
+
+config = get_config()  # Loads and validates configuration
+```
+
+The bot uses Python's `dotenv` library to load environment variables from the `.env` file before reading them.

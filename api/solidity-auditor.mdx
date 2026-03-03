@@ -1,0 +1,323 @@
+---
+title: "SolidityAuditor"
+description: "AI-powered smart contract auditor using Anthropic Claude to analyze Solidity code for security vulnerabilities."
+---
+
+## Overview
+
+The `SolidityAuditor` class uses Anthropic's Claude AI to perform automated security audits of Solidity smart contracts. It can audit both GitHub repositories and direct source code.
+
+## Class Definition
+
+```python
+from auditor import SolidityAuditor
+```
+
+## Initialization
+
+<ParamField path="anthropic_api_key" type="str" required>
+  Anthropic API key for Claude access
+</ParamField>
+
+<ParamField path="temp_dir" type="Path" optional>
+  Directory for cloning repositories. Defaults to system temp directory + "audit_repos"
+</ParamField>
+
+```python
+from pathlib import Path
+
+auditor = SolidityAuditor(
+    anthropic_api_key="your_api_key",
+    temp_dir=Path("./temp/audits")
+)
+```
+
+## Methods
+
+### audit_repo(repo_url)
+
+Perform a full security audit of a GitHub repository.
+
+<ParamField path="repo_url" type="str" required>
+  GitHub repository URL to audit
+</ParamField>
+
+```python
+report = auditor.audit_repo("https://github.com/owner/repo")
+```
+
+<ResponseField name="return" type="FullAuditReport">
+  Complete audit report containing:
+  - `repo_url` - Repository URL audited
+  - `audit_date` - When the audit was performed
+  - `files_audited` - Number of Solidity files analyzed
+  - `total_findings` - Total number of issues found
+  - `critical_count` - Number of critical severity issues
+  - `high_count` - Number of high severity issues
+  - `medium_count` - Number of medium severity issues
+  - `low_count` - Number of low severity issues
+  - `findings` - List of Finding objects
+  - `summary` - Human-readable summary
+  - `error` - Error message if audit failed
+</ResponseField>
+
+**Process:**
+1. Clones repository to temp directory (shallow clone)
+2. Finds all `.sol` files (excluding tests/mocks)
+3. Audits each file individually
+4. Aggregates findings and generates summary
+5. Cleans up cloned repository
+
+### audit_source_code(source_code, contract_name)
+
+Audit source code directly without cloning a repository.
+
+<ParamField path="source_code" type="str" required>
+  Solidity source code to audit. Can be single file or multi-file JSON format from Basescan.
+</ParamField>
+
+<ParamField path="contract_name" type="str" default="Unknown">
+  Name of the contract for reference in findings
+</ParamField>
+
+```python
+source = '''
+pragma solidity ^0.8.0;
+
+contract MyContract {
+    // ... contract code
+}
+'''
+
+report = auditor.audit_source_code(source, "MyContract")
+```
+
+<ResponseField name="return" type="FullAuditReport">
+  Audit report (same structure as audit_repo)
+</ResponseField>
+
+**Note:** Handles multi-file JSON format from Basescan automatically.
+
+### audit_file(file_path)
+
+Audit a single Solidity file.
+
+<ParamField path="file_path" type="Path" required>
+  Path to Solidity file to audit
+</ParamField>
+
+```python
+from pathlib import Path
+
+result = auditor.audit_file(Path("./contracts/MyContract.sol"))
+```
+
+<ResponseField name="return" type="AuditResult">
+  Result for single file containing:
+  - `file_path` - Path to the audited file
+  - `findings` - List of Finding objects
+  - `error` - Error message if audit failed
+</ResponseField>
+
+### clone_repo(repo_url)
+
+Clone a GitHub repository to temporary directory.
+
+<ParamField path="repo_url" type="str" required>
+  GitHub repository URL
+</ParamField>
+
+```python
+repo_path = auditor.clone_repo("https://github.com/owner/repo")
+```
+
+<ResponseField name="return" type="Path">
+  Path to cloned repository
+</ResponseField>
+
+**Note:** Performs shallow clone (depth=1) for faster cloning.
+
+### find_solidity_files(repo_path)
+
+Find all Solidity files in a repository.
+
+<ParamField path="repo_path" type="Path" required>
+  Path to repository directory
+</ParamField>
+
+```python
+sol_files = auditor.find_solidity_files(Path("./repo"))
+```
+
+<ResponseField name="return" type="list[Path]">
+  List of paths to Solidity files. Excludes test files, mocks, and node_modules.
+</ResponseField>
+
+**Search locations:**
+- `contracts/`
+- `src/`
+- `lib/`
+- Repository root
+
+### cleanup(repo_path)
+
+Remove a cloned repository.
+
+<ParamField path="repo_path" type="Path" required>
+  Path to repository to delete
+</ParamField>
+
+```python
+auditor.cleanup(Path("./temp/repo"))
+```
+
+## Data Classes
+
+### Finding
+
+Represents a single security finding.
+
+```python
+from auditor import Finding
+```
+
+<ParamField path="severity" type="str">
+  Severity level: "Critical", "High", "Medium", or "Low"
+</ParamField>
+
+<ParamField path="title" type="str">
+  Brief title describing the issue
+</ParamField>
+
+<ParamField path="description" type="str">
+  Detailed description of the vulnerability
+</ParamField>
+
+<ParamField path="location" type="str" optional>
+  Function name or line reference where issue was found
+</ParamField>
+
+<ParamField path="recommendation" type="str" optional>
+  Suggested fix for the issue
+</ParamField>
+
+### AuditResult
+
+Result of auditing a single file.
+
+```python
+from auditor import AuditResult
+```
+
+<ParamField path="file_path" type="str">
+  Path to the audited file
+</ParamField>
+
+<ParamField path="findings" type="list[Finding]">
+  List of findings in this file
+</ParamField>
+
+<ParamField path="error" type="str" optional>
+  Error message if audit failed
+</ParamField>
+
+### FullAuditReport
+
+Complete audit report for a repository or source code.
+
+```python
+from auditor import FullAuditReport
+```
+
+<ParamField path="repo_url" type="str">
+  Repository URL or "direct_source" for source code audits
+</ParamField>
+
+<ParamField path="audit_date" type="datetime">
+  When the audit was performed
+</ParamField>
+
+<ParamField path="files_audited" type="int">
+  Number of Solidity files analyzed
+</ParamField>
+
+<ParamField path="total_findings" type="int">
+  Total number of issues found
+</ParamField>
+
+<ParamField path="critical_count" type="int">
+  Number of critical severity issues
+</ParamField>
+
+<ParamField path="high_count" type="int">
+  Number of high severity issues
+</ParamField>
+
+<ParamField path="medium_count" type="int">
+  Number of medium severity issues
+</ParamField>
+
+<ParamField path="low_count" type="int">
+  Number of low severity issues
+</ParamField>
+
+<ParamField path="findings" type="list[Finding]">
+  All findings from the audit
+</ParamField>
+
+<ParamField path="summary" type="str">
+  Human-readable summary of the audit
+</ParamField>
+
+<ParamField path="error" type="str" optional>
+  Error message if audit failed
+</ParamField>
+
+## Vulnerability Detection
+
+The auditor checks for these vulnerability categories:
+
+1. **Reentrancy attacks** - State changes after external calls, cross-function reentrancy
+2. **Access control issues** - Missing modifiers, improper role management
+3. **Integer overflow/underflow** - Unchecked arithmetic
+4. **Unchecked external calls** - Missing return value checks
+5. **Centralization risks** - Single owner control, upgrade mechanisms
+6. **Gas optimization issues** - Unbounded loops, expensive storage
+7. **Logic errors** - Incorrect state transitions, race conditions
+8. **Front-running vulnerabilities** - Price manipulation, sandwich attacks
+9. **Denial of Service** - Block gas limit issues
+10. **Oracle manipulation** - Price oracle issues, flash loan attacks
+
+## Example Usage
+
+```python
+from auditor import SolidityAuditor
+
+# Initialize auditor
+auditor = SolidityAuditor(anthropic_api_key="your_key")
+
+# Audit a GitHub repository
+report = auditor.audit_repo("https://github.com/owner/repo")
+
+print(f"Audited {report.files_audited} files")
+print(f"Found {report.total_findings} issues:")
+print(f"  Critical: {report.critical_count}")
+print(f"  High: {report.high_count}")
+print(f"  Medium: {report.medium_count}")
+print(f"  Low: {report.low_count}")
+
+for finding in report.findings:
+    if finding.severity == "Critical":
+        print(f"\n🚨 {finding.title}")
+        print(f"   {finding.description}")
+        print(f"   Location: {finding.location}")
+        print(f"   Fix: {finding.recommendation}")
+```
+
+## Configuration
+
+- **Max file size:** 100KB per file (larger files are skipped)
+- **Max retries:** 2 retries on API errors
+- **Model:** claude-sonnet-4-20250514
+- **Max tokens:** 4096 per response
+- **Rate limiting:** 60 second wait on rate limit errors

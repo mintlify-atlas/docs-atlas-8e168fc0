@@ -1,0 +1,176 @@
+---
+title: "Base Audit Bot"
+description: "Autonomous AI agent that monitors Base blockchain deployments and audits smart contracts for security vulnerabilities"
+---
+
+# Base Audit Bot
+
+An autonomous AI agent that monitors Base blockchain deployments, audits GitHub repositories for smart contract vulnerabilities, and posts findings to Twitter.
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get the bot running in minutes
+  </Card>
+  <Card title="Installation" icon="download" href="/installation">
+    Detailed setup instructions
+  </Card>
+  <Card title="Configuration" icon="gear" href="/guides/configuration">
+    Configure API keys and settings
+  </Card>
+  <Card title="Architecture" icon="sitemap" href="/concepts/architecture">
+    Understand how the bot works
+  </Card>
+</CardGroup>
+
+## What is Base Audit Bot?
+
+Base Audit Bot is a fully autonomous security monitoring system for the Base blockchain. It continuously scans for new smart contract deployments, automatically finds their source code on GitHub, performs AI-powered security audits using Claude, and shares the results on Twitter.
+
+<Info>
+The bot uses **Claude Sonnet 4** for intelligent vulnerability detection, capable of identifying complex security issues that traditional static analysis tools might miss.
+</Info>
+
+## Who is it for?
+
+- **Security researchers** looking to monitor Base ecosystem for vulnerabilities
+- **DeFi protocols** wanting automated security monitoring of competitor contracts
+- **Blockchain analysts** tracking deployment patterns and code quality
+- **Developers** learning about common smart contract security issues
+- **Twitter communities** focused on Base blockchain security
+
+## Key Features
+
+### 1. Blockchain Monitoring
+Scans Base mainnet continuously for new contract deployments using web3.py. Configurable scan intervals and block ranges allow you to balance between real-time monitoring and API rate limits.
+
+### 2. GitHub Discovery
+Automatically finds source code repositories for verified contracts by analyzing Basescan metadata and extracting GitHub URLs from contract source code comments.
+
+### 3. AI-Powered Audits
+Uses Claude to analyze Solidity code for 10+ vulnerability categories including reentrancy attacks, access control issues, integer overflow/underflow, unchecked external calls, and oracle manipulation.
+
+### 4. Twitter Integration
+Posts audit results, repository updates, and daily summaries automatically. Supports DM commands for manual audit requests. Includes thread generation for contracts with critical findings.
+
+### 5. Webhook Support
+Receives GitHub push notifications for monitored repositories, enabling real-time alerts when audited contracts are updated. Verifies webhook signatures for security.
+
+### 6. SQLite Database
+Tracks contracts, audits, tweets, monitored repositories, and blocklisted addresses. Enables historical analysis and prevents duplicate work.
+
+### 7. Docker Support
+Fully containerized deployment with docker-compose. Includes health checks, volume persistence for data/logs, and automatic restart policies.
+
+### 8. Error Handling
+Automatic retry with exponential backoff for RPC failures (3 attempts), respects API rate limits, gracefully skips unverified contracts, and continues operation after Twitter failures.
+
+## Architecture
+
+The bot is composed of several interconnected components:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     Base Audit Bot                          │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐     │
+│  │  Scanner    │───▶│  GitHub     │───▶│  Auditor    │     │
+│  │  (web3.py)  │    │  Finder     │    │  (Claude)   │     │
+│  └─────────────┘    └─────────────┘    └─────────────┘     │
+│         │                                    │              │
+│         ▼                                    ▼              │
+│  ┌─────────────┐                     ┌─────────────┐       │
+│  │  SQLite DB  │                     │  Twitter    │       │
+│  │             │◀────────────────────│  Bot        │       │
+│  └─────────────┘                     └─────────────┘       │
+│         ▲                                                   │
+│         │                                                   │
+│  ┌─────────────┐                                           │
+│  │  Webhook    │ ◀── GitHub Push Events                    │
+│  │  Server     │                                           │
+│  └─────────────┘                                           │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Vulnerability Detection
+
+The auditor checks for:
+
+- **Reentrancy attacks** - State changes after external calls, cross-function reentrancy
+- **Access control issues** - Missing modifiers, improper role management, unprotected functions
+- **Integer overflow/underflow** - Unchecked arithmetic (especially in older Solidity versions)
+- **Unchecked external calls** - Missing return value checks, call/delegatecall issues
+- **Centralization risks** - Single owner control, upgrade mechanisms, emergency functions
+- **Gas optimization issues** - Unbounded loops, expensive storage operations
+- **Logic errors** - Incorrect state transitions, race conditions
+- **Front-running vulnerabilities** - Price manipulation, sandwich attacks
+- **Denial of Service** - Block gas limit, failed transfers blocking execution
+- **Oracle manipulation** - Price oracle issues, flash loan attacks
+
+## Tweet Formats
+
+The bot automatically posts structured updates:
+
+### Audit Result
+```
+🔍 New audit: TokenContract
+
+📊 Findings: 3 issue(s) found
+⚠️ Critical: 1 | High: 1 | Medium: 1
+
+🔗 Contract: basescan.org/address/0x...
+📁 Repo: username/repo
+
+#BaseChain #SmartContractSecurity
+```
+
+### Repository Update
+```
+🔄 Update detected: username/repo
+
+📝 Fix reentrancy vulnerability
+
+🔗 https://github.com/username/repo/commit/abc123
+
+#BaseChain #Development
+```
+
+### Daily Summary
+```
+📊 Daily Audit Summary
+
+🔍 Contracts scanned: 45
+✅ Audits completed: 12
+⚠️ Issues found: 28
+   - Critical: 2
+   - High: 5
+   - Medium: 21
+
+#BaseChain #SmartContractSecurity
+```
+
+## DM Commands
+
+Users can send direct messages to request manual audits:
+
+```
+audit 0x1234567890abcdef1234567890abcdef12345678
+```
+
+The bot will respond with audit status and post results to the timeline.
+
+<Warning>
+This bot provides automated security analysis for educational purposes. It should not be considered a replacement for professional security audits. Always conduct thorough manual reviews before deploying smart contracts to production.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get the bot running in under 5 minutes
+  </Card>
+  <Card title="Installation Guide" icon="book" href="/installation">
+    Detailed installation and configuration
+  </Card>
+</CardGroup>

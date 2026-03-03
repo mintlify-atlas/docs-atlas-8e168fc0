@@ -1,0 +1,511 @@
+---
+title: Twitter Integration
+description: How Base Audit Bot posts audit results, manages threads, and handles DM commands via Twitter
+---
+
+## Overview
+
+The `TwitterBot` class handles all Twitter interactions, including:
+- Posting audit result tweets
+- Creating detailed finding threads
+- Publishing daily summaries
+- Processing DM commands for manual audits
+- Posting repository update notifications
+
+## Implementation
+
+### Initialization and Authentication
+
+The bot uses both OAuth 1.0a and OAuth 2.0 for different Twitter API endpoints:
+
+```python
+class TwitterBot:
+    """Twitter bot for posting audit results."""
+    
+    MAX_TWEET_LENGTH = 280
+    
+    def __init__(self, credentials: TwitterCredentials):
+        # OAuth 1.0a for posting tweets
+        self.auth = tweepy.OAuthHandler(
+            credentials.api_key,
+            credentials.api_secret
+        )
+        self.auth.set_access_token(
+            credentials.access_token,
+            credentials.access_secret
+        )
+        self.api = tweepy.API(self.auth, wait_on_rate_limit=True)
+        
+        # OAuth 2.0 Client for v2 endpoints
+        self.client = tweepy.Client(
+            bearer_token=credentials.bearer_token,
+            consumer_key=credentials.api_key,
+            consumer_secret=credentials.api_secret,
+            access_token=credentials.access_token,
+            access_token_secret=credentials.access_secret,
+            wait_on_rate_limit=True
+        )
+        
+        # Verify credentials
+        try:
+            self.client.get_me()
+            logger.info("Twitter authentication successful")
+        except Exception as e:
+            logger.error(f"Twitter authentication failed: {e}")
+            raise
+```
+
+### Credentials Structure
+
+```python
+@dataclass
+class TwitterCredentials:
+    """Twitter API credentials."""
+    api_key: str           # Consumer API key
+    api_secret: str        # Consumer API secret
+    access_token: str      # Access token
+    access_secret: str     # Access token secret
+    bearer_token: str      # Bearer token for v2 API
+```
+
+<Info>
+**Twitter API Setup:**
+1. Create a Twitter Developer account
+2. Create a project and app
+3. Generate OAuth 1.0a credentials (API key, secret, access token, access secret)
+4. Generate Bearer token for API v2
+5. Set all five credentials in your `.env` file
+</Info>
+
+## Posting Audit Results
+
+### Standard Audit Tweet
+
+When a contract audit completes, the bot posts a formatted tweet:
+
+```python
+def post_audit(
+    self,
+    contract: Contract,
+    audit: Audit,
+    findings_summary: Optional[str] = None
+) -> Optional[Tweet]:
+    """Post an audit result tweet."""
+    # Build tweet content
+    contract_name = contract.contract_name or "Contract"
+    total_issues = audit.critical_count + audit.high_count + audit.medium_count + audit.low_count
+    
+    # Basescan link
+    basescan_link = f"https://basescan.org/address/{contract.address}"
+    
+    # Build the tweet
+    tweet_text = f"""🔍 New audit: {contract_name}
+
+📊 Findings: {total_issues} issue(s) found
+⚠️ Critical: {audit.critical_count} | High: {audit.high_count} | Medium: {audit.medium_count}
+
+🔗 Contract: {basescan_link}"""
+    
+    # Add repo link if available
+    if contract.repo_url:
+        repo_display = contract.repo_url.replace("https://github.com/", "")
+        tweet_text += f"\n📁 Repo: {repo_display}"
+    
+    tweet_text += "\n\n#BaseChain #SmartContractSecurity"
+    
+    # Ensure tweet is within limits
+    if len(tweet_text) > self.MAX_TWEET_LENGTH:
+        tweet_text = self._truncate_tweet(tweet_text)
+    
+    # Post tweet
+    response = self.client.create_tweet(text=tweet_text)
+    
+    if response.data:
+        tweet_id = response.data["id"]
+        logger.info(f"Posted audit tweet: {tweet_id}")
+        
+        return Tweet(
+            id=None,
+            audit_id=audit.id,
+            tweet_id=tweet_id,
+            posted_at=datetime.utcnow(),
+            tweet_type="audit",
+            content=tweet_text
+        )
+    
+    return None
+```
+
+**Example output:**
+```
+🔍 New audit: MyToken
+
+📊 Findings: 3 issue(s) found
+⚠️ Critical: 1 | High: 2 | Medium: 0
+
+🔗 Contract: https://basescan.org/address/0x...
+📁 Repo: owner/repo
+
+#BaseChain #SmartContractSecurity
+```
+
+### Tweet Truncation
+
+Ensures tweets stay within the 280 character limit:
+
+```python
+def _truncate_tweet(self, text: str) -> str:
+    """Truncate tweet to fit within character limit."""
+    if len(text) <= self.MAX_TWEET_LENGTH:
+        return text
+    
+    # Keep hashtags at the end
+    lines = text.split("\n")
+    hashtags = [l for l in lines if l.startswith("#")]
+    content = [l for l in lines if not l.startswith("#")]
+    
+    hashtag_text = "\n".join(hashtags)
+    content_text = "\n".join(content)
+    
+    # Calculate available space
+    available = self.MAX_TWEET_LENGTH - len(hashtag_text) - 5  # 5 for "...\n\n"
+    
+    if len(content_text) > available:
+        content_text = content_text[:available - 3] + "..."
+    
+    return content_text + "\n\n" + hashtag_text
+```
+
+## Detailed Finding Threads
+
+For high-severity issues, the bot posts detailed threads:
+
+```python
+def post_detailed_findings(
+    self,
+    contract: Contract,
+    audit: Audit,
+    findings: list
+) -> list[str]:
+    """Post detailed findings as a thread."""
+    thread_messages = []
+    
+    # First tweet is the summary
+    contract_name = contract.contract_name or "Contract"
+    total_issues = audit.critical_count + audit.high_count + audit.medium_count
+    
+    summary = f"""🧵 Detailed Audit: {contract_name}
+
+📊 {total_issues} significant issue(s) found
+⬇️ Thread with details below
+
+#BaseChain #SmartContractSecurity"""
+    
+    thread_messages.append(summary)
+    
+    # Add findings (Critical and High only to avoid spam)
+    critical_high = [f for f in findings if f.severity.lower() in ["critical", "high"]]
+    
+    for i, finding in enumerate(critical_high[:5], 1):  # Max 5 findings
+        emoji = "🚨" if finding.severity.lower() == "critical" else "⚠️"
+        
+        finding_text = f"""{emoji} Finding {i}: {finding.title}
+
+Severity: {finding.severity}
+{finding.description[:150]}..."""
+        
+        if finding.recommendation:
+            finding_text += f"\n\n💡 Fix: {finding.recommendation[:100]}..."
+        
+        thread_messages.append(finding_text)
+    
+    return self.post_thread(thread_messages)
+```
+
+### Thread Posting
+
+Creates connected tweet threads:
+
+```python
+def post_thread(self, messages: list[str]) -> list[str]:
+    """Post a thread of tweets."""
+    tweet_ids = []
+    reply_to = None
+    
+    for message in messages:
+        try:
+            if len(message) > self.MAX_TWEET_LENGTH:
+                message = self._truncate_tweet(message)
+            
+            if reply_to:
+                response = self.client.create_tweet(
+                    text=message,
+                    in_reply_to_tweet_id=reply_to
+                )
+            else:
+                response = self.client.create_tweet(text=message)
+            
+            if response.data:
+                tweet_id = response.data["id"]
+                tweet_ids.append(tweet_id)
+                reply_to = tweet_id
+                logger.info(f"Posted thread tweet: {tweet_id}")
+        
+        except tweepy.TweepyException as e:
+            logger.error(f"Failed to post thread tweet: {e}")
+            break
+    
+    return tweet_ids
+```
+
+<Info>
+Threads are posted when:
+- Critical count > 0, OR
+- High count >= 2
+
+This avoids spamming followers while highlighting serious issues.
+</Info>
+
+## Daily Summaries
+
+At midnight UTC, the bot posts a daily summary:
+
+```python
+def post_daily_summary(self, stats: dict) -> Optional[Tweet]:
+    """Post daily audit summary."""
+    total_issues = (
+        stats.get("total_critical", 0) +
+        stats.get("total_high", 0) +
+        stats.get("total_medium", 0) +
+        stats.get("total_low", 0)
+    )
+    
+    tweet_text = f"""📊 Daily Audit Summary
+
+🔍 Contracts scanned: {stats.get("contracts_scanned", 0)}
+✅ Audits completed: {stats.get("total_audits", 0)}
+⚠️ Issues found: {total_issues}
+   - Critical: {stats.get("total_critical", 0)}
+   - High: {stats.get("total_high", 0)}
+   - Medium: {stats.get("total_medium", 0)}
+
+#BaseChain #SmartContractSecurity"""
+    
+    response = self.client.create_tweet(text=tweet_text)
+    
+    if response.data:
+        tweet_id = response.data["id"]
+        logger.info(f"Posted daily summary: {tweet_id}")
+        
+        return Tweet(
+            id=None,
+            audit_id=None,
+            tweet_id=tweet_id,
+            posted_at=datetime.utcnow(),
+            tweet_type="summary",
+            content=tweet_text
+        )
+    
+    return None
+```
+
+## DM Command Processing
+
+The bot monitors DMs for audit commands:
+
+```python
+def check_dm_commands(self) -> list[dict]:
+    """Check for DM commands like 'audit [address]'."""
+    commands = []
+    
+    try:
+        # Get direct messages
+        dms = self.api.get_direct_messages(count=20)
+        
+        for dm in dms:
+            text = dm.message_create.get("message_data", {}).get("text", "")
+            sender_id = dm.message_create.get("sender_id")
+            
+            # Check for audit command
+            if text.lower().startswith("audit "):
+                address = text[6:].strip()
+                
+                # Basic address validation
+                if address.startswith("0x") and len(address) == 42:
+                    commands.append({
+                        "type": "audit",
+                        "address": address,
+                        "sender_id": sender_id,
+                        "dm_id": dm.id
+                    })
+    
+    except tweepy.TweepyException as e:
+        logger.error(f"Failed to check DMs: {e}")
+    
+    return commands
+```
+
+### Sending DM Responses
+
+```python
+def send_dm(self, user_id: str, message: str) -> bool:
+    """Send a direct message to a user."""
+    try:
+        self.api.send_direct_message(user_id, message)
+        return True
+    except tweepy.TweepyException as e:
+        logger.error(f"Failed to send DM: {e}")
+        return False
+```
+
+**Command workflow:**
+1. User sends DM: `audit 0x1234...abcd`
+2. Bot validates address format
+3. Bot checks if contract is verified
+4. Bot performs audit
+5. Bot sends DM: `Audit complete for 0x1234...abcd. Check our timeline for results.`
+6. Bot posts public audit tweet
+
+<Warning>
+DM commands require:
+- Twitter API v1.1 access
+- Direct Message write permissions
+- The user must follow your bot account
+</Warning>
+
+## Repository Update Notifications
+
+When monitored repositories receive commits:
+
+```python
+def post_repo_update(
+    self,
+    repo_name: str,
+    commit_message: str,
+    commit_url: str
+) -> Optional[Tweet]:
+    """Post a repository update notification."""
+    # Truncate commit message if needed
+    if len(commit_message) > 100:
+        commit_message = commit_message[:97] + "..."
+    
+    tweet_text = f"""🔄 Update detected: {repo_name}
+
+📝 {commit_message}
+
+🔗 {commit_url}
+
+#BaseChain #Development"""
+    
+    if len(tweet_text) > self.MAX_TWEET_LENGTH:
+        tweet_text = self._truncate_tweet(tweet_text)
+    
+    response = self.client.create_tweet(text=tweet_text)
+    
+    if response.data:
+        tweet_id = response.data["id"]
+        logger.info(f"Posted update tweet: {tweet_id}")
+        
+        return Tweet(
+            id=None,
+            audit_id=None,
+            tweet_id=tweet_id,
+            posted_at=datetime.utcnow(),
+            tweet_type="update",
+            content=tweet_text
+        )
+    
+    return None
+```
+
+## Rate Limiting
+
+Tweepy handles rate limiting automatically:
+
+```python
+# wait_on_rate_limit=True pauses requests when limits are hit
+self.api = tweepy.API(self.auth, wait_on_rate_limit=True)
+self.client = tweepy.Client(..., wait_on_rate_limit=True)
+```
+
+**Twitter API Rate Limits:**
+- **Post tweets**: 300 per 3 hours (user context)
+- **Read DMs**: 300 per 15 minutes
+- **Send DMs**: 500 per 24 hours
+
+<Tip>
+The bot's typical usage:
+- 1-10 audit tweets per hour
+- 1 daily summary per day
+- Occasional threads for critical issues
+- DM checks every 15 minutes
+
+This stays well within rate limits.
+</Tip>
+
+## Integration with Main Bot
+
+The Twitter bot is called after audits complete:
+
+```python
+# Initialize Twitter bot
+twitter_creds = TwitterCredentials(
+    api_key=config.twitter_api_key,
+    api_secret=config.twitter_api_secret,
+    access_token=config.twitter_access_token,
+    access_secret=config.twitter_access_secret,
+    bearer_token=config.twitter_bearer_token
+)
+self.twitter_bot = TwitterBot(twitter_creds)
+
+# Post audit results
+if report and not report.error:
+    tweet = self.twitter_bot.post_audit(contract, audit)
+    
+    if tweet:
+        self.db.add_tweet(tweet)
+        
+        # Post detailed thread for significant findings
+        if report.critical_count > 0 or report.high_count >= 2:
+            self.twitter_bot.post_detailed_findings(
+                contract, audit, report.findings
+            )
+
+# Check for DM commands
+commands = self.twitter_bot.check_dm_commands()
+for cmd in commands:
+    if cmd["type"] == "audit":
+        # Process manual audit request
+        ...
+
+# Post daily summary
+if should_post_summary:
+    stats = self.db.get_daily_stats()
+    self.twitter_bot.post_daily_summary(stats)
+```
+
+## Error Handling
+
+All Twitter operations include error handling:
+
+```python
+try:
+    response = self.client.create_tweet(text=tweet_text)
+    # Process response
+except tweepy.TweepyException as e:
+    logger.error(f"Failed to post tweet: {e}")
+    return None
+```
+
+Failed posts are logged but don't crash the bot, ensuring continuous operation.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="System Architecture" icon="diagram-project" href="/concepts/architecture">
+    See how Twitter integration fits into the overall system
+  </Card>
+  <Card title="Deployment Guide" icon="rocket" href="/deployment/production">
+    Learn how to configure Twitter API credentials
+  </Card>
+</CardGroup>
